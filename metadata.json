@@ -1,0 +1,6 @@
+{
+  "name": "Clean Shield",
+  "description": "Production-ready phone optimisation & security suite with secure 6-digit access PIN, account authentication, email OTP verification, and encrypted vault.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
