@@ -6,17 +6,29 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BorderStroke
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -29,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -36,14 +49,21 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.theme.CleanShieldAmber
+import com.example.ui.theme.CleanShieldBlue
 import com.example.ui.theme.CleanShieldCardBorder
 import com.example.ui.theme.CleanShieldCyan
 import com.example.ui.theme.CleanShieldCyanGlow
 import com.example.ui.theme.CleanShieldDarkNavy
 import com.example.ui.theme.CleanShieldError
+import com.example.ui.theme.CleanShieldTextHint
+import com.example.ui.theme.CleanShieldTextMuted
+import com.example.ui.theme.CleanShieldTextPrimary
+import com.example.ui.theme.CleanShieldTextSecondary
 
 @Composable
 fun LogoutConfirmationDialog(
@@ -248,5 +268,110 @@ fun GlowingScoreBadge(
                 )
             }
         }
+    }
+}
+
+// ═══════════════════════════════════════════════
+// Shared Loading, Error, Empty States
+// ═══════════════════════════════════════════════
+
+@Composable
+fun CleanShieldSkeletonRow(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFE2E8F0))
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(modifier = Modifier.height(14.dp).width(160.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFE2E8F0)))
+            Box(modifier = Modifier.height(10.dp).width(100.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFF1F5F9)))
+        }
+    }
+}
+
+@Composable
+fun CleanShieldSkeletonList(itemCount: Int = 5, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
+        repeat(itemCount) {
+            CleanShieldSkeletonRow()
+        }
+    }
+}
+
+@Composable
+fun CleanShieldErrorView(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Warning,
+            contentDescription = null,
+            tint = CleanShieldAmber,
+            modifier = Modifier.size(48.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = message,
+            color = CleanShieldTextSecondary,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        OutlinedButton(
+            onClick = onRetry,
+            border = BorderStroke(1.dp, CleanShieldBlue),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = CleanShieldBlue)
+        ) {
+            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("Retry", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+fun CleanShieldEmptyState(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth().padding(48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = CleanShieldTextMuted,
+            modifier = Modifier.size(56.dp)
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = title,
+            color = CleanShieldTextPrimary,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = subtitle,
+            color = CleanShieldTextHint,
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center
+        )
     }
 }

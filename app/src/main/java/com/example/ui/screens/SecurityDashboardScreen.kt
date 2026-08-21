@@ -1,13 +1,7 @@
 package com.example.ui.screens
 
 import android.widget.Toast
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,10 +11,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -28,21 +20,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -57,55 +42,43 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AuthRepository
-import com.example.ui.components.CategoryIconBox
+import com.example.ui.components.CleanShieldBottomNavBar
+import com.example.ui.components.CleanShieldTab
+import com.example.ui.components.CleanShieldTopHeader
 import com.example.ui.theme.CleanShieldBlue
 import com.example.ui.theme.CleanShieldCardBg
 import com.example.ui.theme.CleanShieldCardBorder
-import com.example.ui.theme.CleanShieldCardInner
 import com.example.ui.theme.CleanShieldCyan
 import com.example.ui.theme.CleanShieldCyanBright
-import com.example.ui.theme.CleanShieldDarkNavy
 import com.example.ui.theme.CleanShieldDeepBg
-import com.example.ui.theme.CleanShieldDeepBlue
 import com.example.ui.theme.CleanShieldGreen
 import com.example.ui.theme.CleanShieldTextDim
 import com.example.ui.theme.CleanShieldTextMuted
-import com.example.ui.theme.CleanShieldTextWhite
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SecurityDashboardScreen(
-    initialCategory: OptimizationCategory?,
-    onRescanRequested: () -> Unit,
-    onLockRequested: () -> Unit,
-    onSignOutRequested: () -> Unit,
-    onOpenProfileRequested: () -> Unit = {},
+    initialCategory: OptimizationCategory? = null,
+    onLogout: () -> Unit,
+    onNavigateToInbox: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
+    onNavigateToProfile: () -> Unit = {},
+    onNavigateToFriends: () -> Unit = {},
+    onNavigateToVault: () -> Unit = {},
+    onNavigateToSearch: () -> Unit = {},
+    onRescanRequested: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val repository = remember { AuthRepository.getInstance(context) }
 
     val currentSession by repository.currentSession.collectAsState()
-    val username = currentSession?.username ?: "alex"
-
-    var showLogoutConfirmDialog by remember { mutableStateOf(false) }
-
-    if (showLogoutConfirmDialog) {
-        com.example.ui.components.LogoutConfirmationDialog(
-            onConfirm = {
-                showLogoutConfirmDialog = false
-                onSignOutRequested()
-            },
-            onDismiss = { showLogoutConfirmDialog = false }
-        )
-    }
 
     // Phone Optimizer state
     var storageCleaned by remember { mutableStateOf(false) }
@@ -113,169 +86,70 @@ fun SecurityDashboardScreen(
     var virusChecked by remember { mutableStateOf(false) }
     var currentRamUsedPercent by remember { mutableIntStateOf(54) }
 
-    val cyanTealGradient = remember {
-        Brush.horizontalGradient(listOf(CleanShieldCyanBright, CleanShieldBlue))
-    }
-
     Scaffold(
         modifier = modifier
             .fillMaxSize()
             .testTag("security_dashboard_screen"),
         topBar = {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(cyanTealGradient)
-                    .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Shield,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "Clean Shield",
-                                color = Color.White,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Active Protection",
-                                color = Color.White.copy(alpha = 0.85f),
-                                fontSize = 11.sp
-                            )
-                        }
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = onOpenProfileRequested,
-                            modifier = Modifier.testTag("dashboard_profile_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "Profile",
-                                tint = Color.White
-                            )
-                        }
-
-                        IconButton(
-                            onClick = onLockRequested,
-                            modifier = Modifier.testTag("dashboard_lock_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = "Lock",
-                                tint = Color.White
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { showLogoutConfirmDialog = true },
-                            modifier = Modifier.testTag("dashboard_signout_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Logout,
-                                contentDescription = "Sign Out",
-                                tint = Color.White
-                            )
-                        }
+            CleanShieldTopHeader(
+                title = "Clean Shield",
+                onLogoutClicked = onLogout,
+                onMessengerClicked = onNavigateToInbox,
+                onNotificationClicked = onNavigateToNotifications
+            )
+        },
+        bottomBar = {
+            CleanShieldBottomNavBar(
+                selectedTab = CleanShieldTab.PROFILE, // Dashboard doesn't map to a specific tab; no tab highlighted
+                onTabSelected = { tab ->
+                    when (tab) {
+                        CleanShieldTab.PROFILE -> onNavigateToProfile()
+                        CleanShieldTab.FRIENDS -> onNavigateToFriends()
+                        CleanShieldTab.PRIVATE_VAULT -> onNavigateToVault()
+                        CleanShieldTab.SEARCH -> onNavigateToSearch()
                     }
                 }
-            }
+            )
         }
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFFF8FAFC))
+                .background(CleanShieldDeepBg)
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Profile & Social Hub Quick Navigation Banner
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .clickable { onOpenProfileRequested() },
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFE0F2FE)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null,
-                                tint = CleanShieldBlue,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Text(
-                                text = "Welcome, @$username",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = CleanShieldDarkNavy
-                            )
-                            Text(
-                                text = "Tap to open Profile, Friends & Vault",
-                                fontSize = 12.sp,
-                                color = Color.Gray
-                            )
-                        }
-                    }
+            Spacer(modifier = Modifier.height(8.dp))
 
-                    Button(
-                        onClick = onOpenProfileRequested,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = CleanShieldBlue),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text("Open Hub", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
+            // Gradient heading: "Secure Your Device"
+            Text(
+                text = "Secure Your Device",
+                style = TextStyle(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(CleanShieldCyanBright, CleanShieldBlue)
+                    ),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp
+                ),
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+
+            Text(
+                text = "Run quick optimizations to keep your device safe and fast.",
+                color = CleanShieldTextDim,
+                fontSize = 13.sp
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             // System Protection Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                colors = CardDefaults.cardColors(containerColor = CleanShieldCardBg),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Row(
@@ -288,7 +162,7 @@ fun SecurityDashboardScreen(
                                 text = "System Status",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = Color.Gray
+                                color = CleanShieldTextMuted
                             )
                             Text(
                                 text = "100% Protected",
@@ -318,7 +192,7 @@ fun SecurityDashboardScreen(
                             .height(8.dp)
                             .clip(RoundedCornerShape(4.dp)),
                         color = CleanShieldGreen,
-                        trackColor = Color(0xFFE2E8F0)
+                        trackColor = CleanShieldCardBorder
                     )
                 }
             }
@@ -327,7 +201,7 @@ fun SecurityDashboardScreen(
             OptimizerActionRow(
                 icon = Icons.Default.CleaningServices,
                 title = "Storage Cleaner",
-                subtitle = if (storageCleaned) "Cleaned — 0 B residual cache" else "1.4 GB residual cache files ready to clean",
+                subtitle = if (storageCleaned) "Cleaned \u2014 0 B residual cache" else "1.4 GB residual cache files ready to clean",
                 actionLabel = if (storageCleaned) "Cleaned" else "Clean Junk",
                 isCompleted = storageCleaned,
                 onAction = {
@@ -362,6 +236,8 @@ fun SecurityDashboardScreen(
                     Toast.makeText(context, "Threat scan clean. Zero vulnerabilities.", Toast.LENGTH_SHORT).show()
                 }
             )
+
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -378,8 +254,8 @@ private fun OptimizerActionRow(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp)
+        colors = CardDefaults.cardColors(containerColor = CleanShieldCardBg),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Row(
             modifier = Modifier
@@ -389,15 +265,15 @@ private fun OptimizerActionRow(
         ) {
             Box(
                 modifier = Modifier
-                    .size(42.dp)
+                    .size(44.dp)
                     .clip(CircleShape)
-                    .background(if (isCompleted) Color(0xFFDCFCE7) else Color(0xFFE0F2FE)),
+                    .background(if (isCompleted) CleanShieldGreen.copy(alpha = 0.15f) else CleanShieldCyan.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (isCompleted) CleanShieldGreen else CleanShieldBlue,
+                    tint = if (isCompleted) CleanShieldGreen else CleanShieldCyan,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -409,13 +285,13 @@ private fun OptimizerActionRow(
                     text = title,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    color = CleanShieldDarkNavy
+                    color = CleanShieldTextMuted
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
                     fontSize = 12.sp,
-                    color = Color.Gray
+                    color = CleanShieldTextDim
                 )
             }
 
@@ -427,7 +303,7 @@ private fun OptimizerActionRow(
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = CleanShieldBlue,
-                    disabledContainerColor = Color(0xFFDCFCE7),
+                    disabledContainerColor = CleanShieldGreen.copy(alpha = 0.15f),
                     disabledContentColor = CleanShieldGreen
                 ),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)

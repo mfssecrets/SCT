@@ -42,7 +42,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ClearAll
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Person
@@ -94,6 +93,7 @@ import com.example.data.NotificationItemWithUser
 import com.example.data.SocialRepository
 import com.example.data.SupabaseNotification
 import com.example.data.SupabaseProfile
+import com.example.ui.components.CleanShieldErrorView
 import com.example.ui.theme.CleanShieldBlue
 import com.example.ui.theme.CleanShieldCardBorder
 import com.example.ui.theme.CleanShieldCyan
@@ -468,7 +468,8 @@ fun NotificationsScreen(
 
                 // Error State
                 hasError -> {
-                    NotificationErrorState(
+                    CleanShieldErrorView(
+                        message = "Failed to load notifications",
                         onRetry = {
                             hasError = false
                             isRefreshing = true
@@ -977,58 +978,6 @@ fun NotificationEmptyState(
                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Refresh", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-            }
-        }
-    }
-}
-
-@Composable
-fun NotificationErrorState(
-    onRetry: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(
-                imageVector = Icons.Default.ErrorOutline,
-                contentDescription = null,
-                tint = CleanShieldError,
-                modifier = Modifier.size(56.dp)
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "Failed to load notifications",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = CleanShieldDarkNavy
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "An error occurred while loading your notification feed. Please try again.",
-                fontSize = 13.sp,
-                color = Color.Gray,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Button(
-                onClick = onRetry,
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = CleanShieldBlue)
-            ) {
-                Text("Retry", fontWeight = FontWeight.Bold)
             }
         }
     }

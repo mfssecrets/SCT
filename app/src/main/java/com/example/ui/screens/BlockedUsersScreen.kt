@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -53,10 +52,11 @@ import coil.request.ImageRequest
 import com.example.data.AuthRepository
 import com.example.data.SocialRepository
 import com.example.data.SupabaseProfile
+import com.example.ui.components.CleanShieldErrorView
+import com.example.ui.components.CleanShieldSkeletonList
 import com.example.ui.components.CleanShieldTopHeader
 import com.example.ui.theme.CleanShieldBlue
 import com.example.ui.theme.CleanShieldDarkNavy
-import com.example.ui.theme.CleanShieldError
 import kotlinx.coroutines.launch
 
 @Composable
@@ -73,6 +73,7 @@ fun BlockedUsersScreen(
     val currentUsername = currentSession?.username ?: ""
 
     val blockedUsers by socialRepo.getBlockedUsersFlow(currentUsername).collectAsState(initial = null)
+    var hasError by remember { mutableStateOf(false) }
     var userToUnblock by remember { mutableStateOf<SupabaseProfile?>(null) }
 
     Scaffold(
@@ -94,15 +95,12 @@ fun BlockedUsersScreen(
                 .background(Color.White)
         ) {
             if (blockedUsers == null) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        color = CleanShieldBlue,
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
+                CleanShieldSkeletonList(itemCount = 3)
+            } else if (hasError) {
+                CleanShieldErrorView(
+                    message = "Failed to load blocked users",
+                    onRetry = { hasError = false }
+                )
             } else if (blockedUsers!!.isEmpty()) {
                 Box(
                     modifier = Modifier

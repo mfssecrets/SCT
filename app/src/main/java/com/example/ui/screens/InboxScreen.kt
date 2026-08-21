@@ -27,14 +27,15 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Badge
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,10 +52,11 @@ import coil.request.ImageRequest
 import com.example.data.AuthRepository
 import com.example.data.ChatRepository
 import com.example.data.InboxConversation
+import com.example.ui.components.CleanShieldErrorView
+import com.example.ui.components.CleanShieldSkeletonList
 import com.example.ui.components.CleanShieldTopHeader
 import com.example.ui.theme.CleanShieldBlue
 import com.example.ui.theme.CleanShieldDarkNavy
-import com.example.ui.theme.CleanShieldError
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -73,6 +75,7 @@ fun InboxScreen(
     val currentUsername = currentSession?.username ?: ""
 
     val inboxList by chatRepo.getInboxFlow(currentUsername).collectAsState(initial = null)
+    var hasError by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier
@@ -94,13 +97,12 @@ fun InboxScreen(
         ) {
             if (inboxList == null) {
                 // Skeleton loading state
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = CleanShieldBlue)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("Loading conversations...", color = Color.Gray, fontSize = 13.sp)
-                    }
-                }
+                CleanShieldSkeletonList(itemCount = 5)
+            } else if (hasError) {
+                CleanShieldErrorView(
+                    message = "Failed to load conversations",
+                    onRetry = { hasError = false }
+                )
             } else if (inboxList!!.isEmpty()) {
                 // Empty state
                 Box(

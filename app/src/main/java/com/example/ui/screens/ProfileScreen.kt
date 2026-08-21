@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -38,21 +37,17 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QuestionAnswer
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
+import com.example.ui.components.CleanShieldBottomNavBar
+import com.example.ui.components.CleanShieldTab
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -95,12 +90,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-enum class ProfileNavTab {
-    PROFILE,
-    FRIENDS,
-    PRIVATE_VAULT,
-    SEARCH
-}
+// Navigation tabs now use shared CleanShieldTab from components
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,7 +112,7 @@ fun ProfileScreen(
     val currentSession by repository.currentSession.collectAsState()
     val userId = currentSession?.id ?: 0L
 
-    var selectedNavTab by remember { mutableStateOf(ProfileNavTab.PROFILE) }
+    // selectedNavTab removed — CleanShieldBottomNavBar handles selection internally
     var showLogoutConfirmDialog by remember { mutableStateOf(false) }
 
     if (showLogoutConfirmDialog) {
@@ -156,6 +146,8 @@ fun ProfileScreen(
     var validationJob by remember { mutableStateOf<Job?>(null) }
 
     var isSaving by remember { mutableStateOf(false) }
+    var isUploadingPhoto by remember { mutableStateOf(false) }
+    var photoUploadProgress by remember { mutableFloatStateOf(0f) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     // Real gradient colors
@@ -322,132 +314,17 @@ fun ProfileScreen(
             }
         },
         bottomBar = {
-            // Fixed Bottom Navigation: Profile, Friends, Private Vault, Search
-            NavigationBar(
-                containerColor = Color.White,
-                tonalElevation = 8.dp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .shadow(8.dp)
-            ) {
-                // 1. Profile (Active)
-                NavigationBarItem(
-                    selected = selectedNavTab == ProfileNavTab.PROFILE,
-                    onClick = { selectedNavTab = ProfileNavTab.PROFILE },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = "Profile"
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = "Profile",
-                            fontSize = 11.sp,
-                            fontWeight = if (selectedNavTab == ProfileNavTab.PROFILE) FontWeight.Bold else FontWeight.Normal
-                        )
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = CleanShieldBlue,
-                        selectedTextColor = CleanShieldBlue,
-                        unselectedIconColor = Color.Gray,
-                        unselectedTextColor = Color.Gray,
-                        indicatorColor = CleanShieldCyanBright.copy(alpha = 0.2f)
-                    ),
-                    modifier = Modifier.testTag("bottom_nav_profile")
-                )
-
-                // 2. Friends
-                NavigationBarItem(
-                    selected = selectedNavTab == ProfileNavTab.FRIENDS,
-                    onClick = {
-                        selectedNavTab = ProfileNavTab.FRIENDS
-                        onNavigateToFriends()
-                    },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.Group,
-                            contentDescription = "Friends"
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = "Friends",
-                            fontSize = 11.sp,
-                            fontWeight = if (selectedNavTab == ProfileNavTab.FRIENDS) FontWeight.Bold else FontWeight.Normal
-                        )
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = CleanShieldBlue,
-                        selectedTextColor = CleanShieldBlue,
-                        unselectedIconColor = Color.Gray,
-                        unselectedTextColor = Color.Gray,
-                        indicatorColor = CleanShieldCyanBright.copy(alpha = 0.2f)
-                    ),
-                    modifier = Modifier.testTag("bottom_nav_friends")
-                )
-
-                // 3. Private Vault
-                NavigationBarItem(
-                    selected = selectedNavTab == ProfileNavTab.PRIVATE_VAULT,
-                    onClick = {
-                        selectedNavTab = ProfileNavTab.PRIVATE_VAULT
-                        onNavigateToVault()
-                    },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = "Private Vault"
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = "Private Vault",
-                            fontSize = 11.sp,
-                            fontWeight = if (selectedNavTab == ProfileNavTab.PRIVATE_VAULT) FontWeight.Bold else FontWeight.Normal
-                        )
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = CleanShieldBlue,
-                        selectedTextColor = CleanShieldBlue,
-                        unselectedIconColor = Color.Gray,
-                        unselectedTextColor = Color.Gray,
-                        indicatorColor = CleanShieldCyanBright.copy(alpha = 0.2f)
-                    ),
-                    modifier = Modifier.testTag("bottom_nav_vault")
-                )
-
-                // 4. Search
-                NavigationBarItem(
-                    selected = selectedNavTab == ProfileNavTab.SEARCH,
-                    onClick = {
-                        selectedNavTab = ProfileNavTab.SEARCH
-                        onNavigateToSearch()
-                    },
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search"
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = "Search",
-                            fontSize = 11.sp,
-                            fontWeight = if (selectedNavTab == ProfileNavTab.SEARCH) FontWeight.Bold else FontWeight.Normal
-                        )
-                    },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = CleanShieldBlue,
-                        selectedTextColor = CleanShieldBlue,
-                        unselectedIconColor = Color.Gray,
-                        unselectedTextColor = Color.Gray,
-                        indicatorColor = CleanShieldCyanBright.copy(alpha = 0.2f)
-                    ),
-                    modifier = Modifier.testTag("bottom_nav_search")
-                )
-            }
+            CleanShieldBottomNavBar(
+                selectedTab = CleanShieldTab.PROFILE,
+                onTabSelected = { tab ->
+                    when (tab) {
+                        CleanShieldTab.PROFILE -> { /* already on profile */ }
+                        CleanShieldTab.FRIENDS -> onNavigateToFriends()
+                        CleanShieldTab.PRIVATE_VAULT -> onNavigateToVault()
+                        CleanShieldTab.SEARCH -> onNavigateToSearch()
+                    }
+                }
+            )
         }
     ) { paddingValues ->
         // Clean White Content Area
@@ -534,13 +411,39 @@ fun ProfileScreen(
                             )
                         }
                     }
+                    // Upload progress overlay
+                    if (isUploadingPhoto) {
+                        Box(
+                            modifier = Modifier
+                                .matchParentSize()
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.6f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(
+                                    progress = { photoUploadProgress },
+                                    color = CleanShieldCyan,
+                                    strokeWidth = 3.dp,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "${(photoUploadProgress * 100).toInt()}%",
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Tap photo to upload or change",
-                    color = Color.Gray,
+                    text = if (isUploadingPhoto) "Uploading photo..." else "Tap photo to upload or change",
+                    color = if (isUploadingPhoto) CleanShieldCyan else Color.Gray,
                     fontSize = 12.sp
                 )
 

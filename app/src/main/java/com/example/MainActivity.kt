@@ -6,8 +6,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -17,13 +18,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleStartEffect
 import com.example.data.AuthRepository
 import com.example.data.supabase.SupabaseClient
 import com.example.ui.components.CleanShieldTab
 import com.example.ui.screens.BlockedUsersScreen
 import com.example.ui.screens.CallScreen
+import com.example.ui.screens.CleanShieldSplashScreen
 import com.example.ui.screens.ChatScreen
 import com.example.ui.screens.CreateAccessPinScreen
 import com.example.ui.screens.EmailVerificationScreen
@@ -43,6 +43,7 @@ import com.example.ui.screens.SignUpScreen
 import com.example.ui.theme.MyApplicationTheme
 
 sealed interface AppScreen {
+    data object Splash : AppScreen
     data object Scanning : AppScreen
     data object Complete : AppScreen
     data class CreatePin(val category: OptimizationCategory?) : AppScreen
@@ -91,8 +92,8 @@ fun CleanShieldApp(
     val context = LocalContext.current
     val authRepository = remember { AuthRepository.getInstance(context) }
 
-    // Every app launch starts cleanly with Scanning -> Optimise Complete
-    var currentScreen by remember { mutableStateOf<AppScreen>(AppScreen.Scanning) }
+    // Every app launch starts with Splash -> Scanning -> Optimise Complete
+    var currentScreen by remember { mutableStateOf<AppScreen>(AppScreen.Splash) }
 
     fun navigateToTab(tab: CleanShieldTab) {
         currentScreen = when (tab) {
@@ -106,6 +107,7 @@ fun CleanShieldApp(
     // Handle Android system back button
     BackHandler {
         when (currentScreen) {
+            is AppScreen.Splash -> { /* no back during splash */ }
             is AppScreen.Scanning -> onCloseApp()
             is AppScreen.Complete -> onCloseApp()
             is AppScreen.CreatePin -> currentScreen = AppScreen.Complete
@@ -138,11 +140,25 @@ fun CleanShieldApp(
 
     AnimatedContent(
         targetState = currentScreen,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        transitionSpec = {
+            val direction = if (initialState.ordinal < targetState.ordinal) 1 else -1
+            slideInHorizontally(
+                animationSpec = tween(350)
+            ) { (it * direction * 0.15f).toInt() } togetherWith
+            slideOutHorizontally(
+                animationSpec = tween(350)
+            ) { (-it * direction * 0.15f).toInt() }
+        },
         label = "clean_shield_flow",
         modifier = modifier.fillMaxSize()
     ) { screen ->
         when (screen) {
+            is AppScreen.Splash -> {
+                CleanShieldSplashScreen(
+                    onComplete = { currentScreen = AppScreen.Scanning }
+                )
+            }
+
             is AppScreen.Scanning -> {
                 OptimiseScanningScreen(
                     onScanComplete = {
@@ -256,17 +272,30 @@ fun CleanShieldApp(
             is AppScreen.Dashboard -> {
                 SecurityDashboardScreen(
                     initialCategory = screen.category,
-                    onRescanRequested = {
-                        currentScreen = AppScreen.Scanning
-                    },
-                    onLockRequested = {
-                        currentScreen = AppScreen.EnterPin(null)
-                    },
-                    onSignOutRequested = {
+                    onLogout = {
+                        authRepository.signOut()
                         currentScreen = AppScreen.SignIn(null)
                     },
-                    onOpenProfileRequested = {
+                    onNavigateToInbox = {
+                        currentScreen = AppScreen.Inbox
+                    },
+                    onNavigateToNotifications = {
+                        currentScreen = AppScreen.Notifications
+                    },
+                    onNavigateToProfile = {
                         currentScreen = AppScreen.Profile
+                    },
+                    onNavigateToFriends = {
+                        currentScreen = AppScreen.Friends
+                    },
+                    onNavigateToVault = {
+                        currentScreen = AppScreen.PrivateVault
+                    },
+                    onNavigateToSearch = {
+                        currentScreen = AppScreen.Search
+                    },
+                    onRescanRequested = {
+                        currentScreen = AppScreen.Scanning
                     }
                 )
             }

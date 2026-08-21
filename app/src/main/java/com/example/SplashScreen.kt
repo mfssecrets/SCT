@@ -1,14 +1,20 @@
 package com.example
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,9 +31,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import com.example.ui.theme.CleanShieldBlue
 import com.example.ui.theme.CleanShieldCyan
 import com.example.ui.theme.CleanShieldPink
@@ -42,12 +51,15 @@ import kotlin.math.max
 @Composable
 fun CleanShieldSplashScreen(
     modifier: Modifier = Modifier,
-    enableAnimation: Boolean = true
+    enableAnimation: Boolean = true,
+    onComplete: () -> Unit = {}
 ) {
     var startAnimation by remember { mutableStateOf(!enableAnimation) }
 
     LaunchedEffect(Unit) {
         startAnimation = true
+        delay(1500L)
+        onComplete()
     }
 
     val alphaAnim by animateFloatAsState(
@@ -81,19 +93,35 @@ fun CleanShieldSplashScreen(
             },
         contentAlignment = Alignment.Center
     ) {
-        // Logo size dynamically calibrated for mobile and tablet screens
-        val logoSize = min(112.dp, maxWidth * 0.28f)
-        val cornerRadius = logoSize * 0.25f
+        AnimatedVisibility(
+            visible = true,
+            enter = fadeIn(animationSpec = tween(600, easing = FastOutSlowInEasing))
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Logo size dynamically calibrated for mobile and tablet screens
+                val logoSize = min(112.dp, maxWidth * 0.28f)
+                val cornerRadius = logoSize * 0.25f
 
-        Box(
-            modifier = Modifier
-                .testTag("logo_placeholder")
-                .size(logoSize)
-                .scale(scaleAnim)
-                .alpha(alphaAnim)
-                .clip(RoundedCornerShape(cornerRadius))
-                .background(CleanShieldPink)
-        )
+                Box(
+                    modifier = Modifier
+                        .testTag("logo_placeholder")
+                        .size(logoSize)
+                        .scale(scaleAnim)
+                        .alpha(alphaAnim)
+                        .clip(RoundedCornerShape(cornerRadius))
+                        .background(CleanShieldPink)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Clean Shield",
+                    color = Color.White,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 }
 

@@ -6,7 +6,6 @@ import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,22 +26,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.MarkEmailRead
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -52,11 +43,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -69,11 +57,8 @@ import com.example.ui.components.SecurityShieldIcon
 import com.example.ui.theme.CleanShieldAmber
 import com.example.ui.theme.CleanShieldCardBg
 import com.example.ui.theme.CleanShieldCardBorder
-import com.example.ui.theme.CleanShieldCardInner
 import com.example.ui.theme.CleanShieldCyan
-import com.example.ui.theme.CleanShieldDarkNavy
 import com.example.ui.theme.CleanShieldDeepBg
-import com.example.ui.theme.CleanShieldDeepBlue
 import com.example.ui.theme.CleanShieldGreen
 import com.example.ui.theme.CleanShieldTextDim
 import com.example.ui.theme.CleanShieldTextMuted
@@ -93,13 +78,21 @@ fun EmailVerificationScreen(
     val context = LocalContext.current
     val repository = remember { AuthRepository.getInstance(context) }
     val scope = rememberCoroutineScope()
-    val clipboardManager = LocalClipboardManager.current
-
-    val latestDispatchedOtp by repository.latestDispatchedOtp.collectAsState()
 
     var enteredOtp by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isVerifying by remember { mutableStateOf(false) }
+
+    // OTP expiration timer: 5 minutes
+    var otpTimerRemaining by remember { mutableIntStateOf(300) }
+    val isCodeExpired = otpTimerRemaining <= 0
+
+    LaunchedEffect(Unit) {
+        while (otpTimerRemaining > 0) {
+            delay(1000)
+            otpTimerRemaining--
+        }
+    }
 
     // Resend cooldown timer
     var cooldownRemaining by remember { mutableIntStateOf(repository.getResendCooldownSeconds(email)) }
@@ -284,73 +277,33 @@ fun EmailVerificationScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Direct Notification Banner (mimicking system email push for effortless testing & verification)
-                if (latestDispatchedOtp != null && latestDispatchedOtp?.first == email) {
-                    val activeCode = latestDispatchedOtp?.second ?: ""
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(CleanShieldCardBg)
-                            .border(1.dp, CleanShieldCyan.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
-                            .padding(14.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Email,
-                                    contentDescription = null,
-                                    tint = CleanShieldCyan,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = "Clean Shield Security Mail",
-                                        color = CleanShieldTextWhite,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "Your verification OTP: $activeCode",
-                                        color = CleanShieldCyan,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-                            }
-
-                            Button(
-                                onClick = {
-                                    enteredOtp = activeCode
-                                    submitOtp(activeCode)
-                                },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = CleanShieldCyan,
-                                    contentColor = CleanShieldDarkNavy
-                                ),
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                modifier = Modifier.height(34.dp).testTag("autofill_otp_button")
-                            ) {
-                                Text(
-                                    text = "Auto-Fill",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
+                // Timer display
+                val minutes = otpTimerRemaining / 60
+                val seconds = otpTimerRemaining % 60
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) {
+                    Text(
+                        text = String.format("%d:%02d", minutes, seconds),
+                        color = if (isCodeExpired) CleanShieldAmber else CleanShieldTextDim,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                // Expiration message
+                if (isCodeExpired) {
+                    Text(
+                        text = "This code has expired. Please request a new one.",
+                        color = CleanShieldAmber,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
 
                 // 6 OTP Digit Boxes
                 Row(
@@ -421,19 +374,29 @@ fun EmailVerificationScreen(
                     }
                 }
 
-                // Resend Section
+                // Resend / Code Expired Section
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
                     modifier = Modifier.padding(top = 4.dp)
                 ) {
-                    Text(
-                        text = "Didn't receive the code? ",
-                        color = CleanShieldTextDim,
-                        fontSize = 13.sp
-                    )
-
-                    if (cooldownRemaining > 0) {
+                    if (isCodeExpired) {
+                        // When expired, show prominent resend button
+                        Text(
+                            text = "Request a new code",
+                            color = CleanShieldCyan,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clickable { handleResend() }
+                                .testTag("resend_expired_otp_button")
+                        )
+                    } else if (cooldownRemaining > 0) {
+                        Text(
+                            text = "Didn't receive the code? ",
+                            color = CleanShieldTextDim,
+                            fontSize = 13.sp
+                        )
                         Text(
                             text = "Resend in ${cooldownRemaining}s",
                             color = CleanShieldTextMuted,
@@ -441,6 +404,11 @@ fun EmailVerificationScreen(
                             fontWeight = FontWeight.Medium
                         )
                     } else {
+                        Text(
+                            text = "Didn't receive the code? ",
+                            color = CleanShieldTextDim,
+                            fontSize = 13.sp
+                        )
                         Text(
                             text = "Resend Code",
                             color = CleanShieldCyan,
@@ -451,6 +419,22 @@ fun EmailVerificationScreen(
                                 .testTag("resend_otp_button")
                         )
                     }
+                }
+
+                // "Code expired?" shortcut — appears after 60s but before full 5min
+                if (otpTimerRemaining in 1..239) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Code expired?",
+                        color = CleanShieldAmber,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clickable(enabled = cooldownRemaining <= 0) {
+                                if (cooldownRemaining <= 0) handleResend()
+                            }
+                            .testTag("code_expired_shortcut")
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
