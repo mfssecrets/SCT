@@ -522,8 +522,37 @@ class SocialRepository private constructor(context: Context) {
         targetUsername: String,
         reason: String
     ): Boolean = withContext(Dispatchers.IO) {
-        // Placeholder — logging can be added server-side later
-        true
+        try {
+            val reporterUuid = resolveUuid(reporterUsername.trim().lowercase()) ?: return@withContext false
+            val targetUuid = resolveUuid(targetUsername.trim().lowercase()) ?: return@withContext false
+            if (reporterUuid == targetUuid) return@withContext false
+            if (reason.isBlank()) return@withContext false
+            // Call the database function to create the report (with server-side validation)
+            postgrest.rpc("report_user_fn") {
+                set("reporter_id", reporterUuid)
+                set("reported_id", targetUuid)
+                set("reason", reason.trim())
+            }
+            true
+        } catch (_: Exception) {
+            // If the RPC doesn't exist yet (migration not deployed), fallback to direct insert
+            try {
+                val reporterUuid = resolveUuid(reporterUsername.trim().lowercase()) ?: return@withContext false
+                val targetUuid = resolveUuid(targetUsername.trim().lowercase()) ?: return@withContext false
+                if (reporterUuid == targetUuid) return@withContext false
+                if (reason.isBlank()) return@withContext false
+                postgrest.from("user_reports").insert(
+                    mapOf(
+                        "reporter_id" to reporterUuid,
+                        "reported_id" to targetUuid,
+                        "reason" to reason.trim()
+                    )
+                )
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
     }
 
     // ===================== NOTIFICATIONS =====================
