@@ -255,7 +255,7 @@ fun InboxRowItem(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Sent indicator if sent by me
-                    if (lastMsg != null && lastMsg.senderUsername.equals(currentUsername, ignoreCase = true)) {
+                    if (lastMsg != null && lastMsg.sender_id.equals(currentUsername, ignoreCase = true)) {
                         Icon(
                             imageVector = if (lastMsg.status == "SEEN") Icons.Default.DoneAll else Icons.Default.Check,
                             contentDescription = null,
@@ -268,9 +268,9 @@ fun InboxRowItem(
                     // Message text / media preview
                     val previewText = when {
                         lastMsg == null -> "Tap to start conversation"
-                        lastMsg.mediaType.startsWith("ONE_SHOT") -> "🔒 One-shot media"
-                        lastMsg.mediaType == "IMAGE" -> "📷 Photo"
-                        lastMsg.mediaType == "VIDEO" -> "🎥 Video"
+                        lastMsg.message_type.startsWith("ONE_SHOT") -> "🔒 One-shot media"
+                        lastMsg.message_type == "IMAGE" -> "📷 Photo"
+                        lastMsg.message_type == "VIDEO" -> "🎥 Video"
                         else -> lastMsg.content
                     }
 

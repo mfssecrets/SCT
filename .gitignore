@@ -16,3 +16,11 @@
 local.properties
 .env
 debug.keystore
+supabase/.temp/
+node_modules/
+deploy-schema.js
+deploy-chunked.js
+fix-policies.js
+package.json
+package-lock.json
+pg-error.log

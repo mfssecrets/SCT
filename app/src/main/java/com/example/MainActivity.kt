@@ -17,7 +17,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleStartEffect
 import com.example.data.AuthRepository
+import com.example.data.supabase.SupabaseClient
 import com.example.ui.components.CleanShieldTab
 import com.example.ui.screens.BlockedUsersScreen
 import com.example.ui.screens.CallScreen
@@ -68,6 +71,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Initialize Supabase client before any UI
+        SupabaseClient.initialize(applicationContext)
         setContent {
             MyApplicationTheme {
                 CleanShieldApp(

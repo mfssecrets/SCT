@@ -77,7 +77,7 @@ import coil.request.ImageRequest
 import com.example.data.AuthRepository
 import com.example.data.SocialRepository
 import com.example.data.VaultRepository
-import com.example.data.local.VaultMediaEntity
+import com.example.data.SupabaseVaultMedia
 import com.example.ui.components.CleanShieldBottomNavBar
 import com.example.ui.components.CleanShieldTab
 import com.example.ui.components.CleanShieldTopHeader
@@ -127,8 +127,8 @@ fun PrivateVaultScreen(
     // Upload & Media viewing state
     var isUploading by remember { mutableStateOf(false) }
     var uploadProgress by remember { mutableStateOf(0f) }
-    var viewingMedia by remember { mutableStateOf<VaultMediaEntity?>(null) }
-    var mediaToDelete by remember { mutableStateOf<VaultMediaEntity?>(null) }
+    var viewingMedia by remember { mutableStateOf<SupabaseVaultMedia?>(null) }
+    var mediaToDelete by remember { mutableStateOf<SupabaseVaultMedia?>(null) }
 
     val cyanTealGradient = remember {
         Brush.horizontalGradient(listOf(CleanShieldCyanBright, CleanShieldBlue))
@@ -449,7 +449,7 @@ fun PrivateVaultScreen(
                 // Media preview
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data(media.mediaUri)
+                        .data(media.media_reference)
                         .crossfade(true)
                         .build(),
                     contentDescription = "Private Media",
@@ -457,7 +457,7 @@ fun PrivateVaultScreen(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                if (media.mediaType == "VIDEO") {
+                if (media.message_type == "VIDEO") {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -504,12 +504,12 @@ fun PrivateVaultScreen(
         AlertDialog(
             onDismissRequest = { mediaToDelete = null },
             title = { Text("Delete Vault Media?", fontWeight = FontWeight.Bold) },
-            text = { Text("Are you sure you want to permanently delete this ${if (target.mediaType == "VIDEO") "video" else "photo"} from your encrypted vault? This action cannot be undone.") },
+            text = { Text("Are you sure you want to permanently delete this ${if (target.message_type == "VIDEO") "video" else "photo"} from your encrypted vault? This action cannot be undone.") },
             confirmButton = {
                 Button(
                     onClick = {
                         scope.launch {
-                            vaultRepo.deleteVaultMedia(target.id, target.mediaUri)
+                            vaultRepo.deleteVaultMedia(target.id, target.media_reference)
                             if (viewingMedia?.id == target.id) viewingMedia = null
                             mediaToDelete = null
                             Toast.makeText(context, "Media deleted from vault.", Toast.LENGTH_SHORT).show()
@@ -531,7 +531,7 @@ fun PrivateVaultScreen(
 
 @Composable
 fun VaultMediaGridItem(
-    media: VaultMediaEntity,
+    media: SupabaseVaultMedia,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
@@ -546,7 +546,7 @@ fun VaultMediaGridItem(
     ) {
         AsyncImage(
             model = ImageRequest.Builder(context)
-                .data(media.mediaUri)
+                .data(media.media_reference)
                 .crossfade(true)
                 .build(),
             contentDescription = "Encrypted Media",
@@ -554,7 +554,7 @@ fun VaultMediaGridItem(
             modifier = Modifier.fillMaxSize()
         )
 
-        if (media.mediaType == "VIDEO") {
+        if (media.message_type == "VIDEO") {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

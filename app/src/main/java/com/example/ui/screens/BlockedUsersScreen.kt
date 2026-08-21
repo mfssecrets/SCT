@@ -52,7 +52,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.AuthRepository
 import com.example.data.SocialRepository
-import com.example.data.local.UserEntity
+import com.example.data.SupabaseProfile
 import com.example.ui.components.CleanShieldTopHeader
 import com.example.ui.theme.CleanShieldBlue
 import com.example.ui.theme.CleanShieldDarkNavy
@@ -73,7 +73,7 @@ fun BlockedUsersScreen(
     val currentUsername = currentSession?.username ?: ""
 
     val blockedUsers by socialRepo.getBlockedUsersFlow(currentUsername).collectAsState(initial = null)
-    var userToUnblock by remember { mutableStateOf<UserEntity?>(null) }
+    var userToUnblock by remember { mutableStateOf<SupabaseProfile?>(null) }
 
     Scaffold(
         modifier = modifier

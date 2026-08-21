@@ -89,8 +89,8 @@ import coil.request.ImageRequest
 import com.example.data.AuthRepository
 import com.example.data.ChatRepository
 import com.example.data.SocialRepository
-import com.example.data.local.ChatMessageEntity
-import com.example.data.local.UserEntity
+import com.example.data.SupabaseMessage
+import com.example.data.SupabaseProfile
 import com.example.ui.theme.CleanShieldBlue
 import com.example.ui.theme.CleanShieldCyanBright
 import com.example.ui.theme.CleanShieldDarkNavy
@@ -119,7 +119,7 @@ fun ChatScreen(
     val currentUsername = currentSession?.username ?: ""
 
     // Partner details
-    var partnerUser by remember { mutableStateOf<UserEntity?>(null) }
+    var partnerUser by remember { mutableStateOf<SupabaseProfile?>(null) }
     LaunchedEffect(partnerUsername) {
         val user = authRepo.database.userDao().getUserByUsername(partnerUsername.trim().lowercase())
         partnerUser = user
@@ -166,7 +166,7 @@ fun ChatScreen(
     var menuExpanded by remember { mutableStateOf(false) }
     var showClearChatDialog by remember { mutableStateOf(false) }
     var showBlockDialog by remember { mutableStateOf(false) }
-    var viewingOneShotMessage by remember { mutableStateOf<ChatMessageEntity?>(null) }
+    var viewingOneShotMessage by remember { mutableStateOf<SupabaseMessage?>(null) }
 
     val listState = rememberLazyListState()
 
@@ -431,12 +431,12 @@ fun ChatScreen(
                 contentPadding = PaddingValues(vertical = 12.dp)
             ) {
                 items(messagesList, key = { it.id }) { msg ->
-                    val isMine = msg.senderUsername.equals(currentUsername, ignoreCase = true)
+                    val isMine = msg.sender_id.equals(currentUsername, ignoreCase = true)
                     ChatMessageBubble(
                         message = msg,
                         isMine = isMine,
                         onOneShotClicked = {
-                            if (!msg.isOneShotOpened) {
+                            if (!msg.one_shot_opened) {
                                 viewingOneShotMessage = msg
                             }
                         }
@@ -594,7 +594,7 @@ fun ChatScreen(
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data(msg.mediaUri)
+                        .data(msg.media_reference)
                         .crossfade(true)
                         .build(),
                     contentDescription = "One-Shot Media",
@@ -699,7 +699,7 @@ fun ChatScreen(
 
 @Composable
 fun ChatMessageBubble(
-    message: ChatMessageEntity,
+    message: SupabaseMessage,
     isMine: Boolean,
     onOneShotClicked: () -> Unit
 ) {
@@ -708,7 +708,7 @@ fun ChatMessageBubble(
         SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(message.timestamp))
     }
 
-    val isOneShot = message.mediaType.startsWith("ONE_SHOT")
+    val isOneShot = message.message_type.startsWith("ONE_SHOT")
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -740,7 +740,7 @@ fun ChatMessageBubble(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(enabled = !message.isOneShotOpened) { onOneShotClicked() }
+                        .clickable(enabled = !message.one_shot_opened) { onOneShotClicked() }
                         .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -752,7 +752,7 @@ fun ChatMessageBubble(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = if (message.isOneShotOpened) Icons.Default.Visibility else Icons.Default.Lock,
+                            imageVector = if (message.one_shot_opened) Icons.Default.Visibility else Icons.Default.Lock,
                             contentDescription = null,
                             tint = if (isMine) Color.White else Color(0xFFD97706),
                             modifier = Modifier.size(18.dp)
@@ -761,19 +761,19 @@ fun ChatMessageBubble(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = if (message.isOneShotOpened) "One-shot Viewed" else "One-Shot Media",
+                            text = if (message.one_shot_opened) "One-shot Viewed" else "One-Shot Media",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (isMine) Color.White else CleanShieldDarkNavy
                         )
                         Text(
-                            text = if (message.isOneShotOpened) "Media has expired" else "Tap to view (view once)",
+                            text = if (message.one_shot_opened) "Media has expired" else "Tap to view (view once)",
                             fontSize = 11.sp,
                             color = if (isMine) Color.White.copy(alpha = 0.75f) else Color.Gray
                         )
                     }
                 }
-            } else if (!message.mediaUri.isNullOrEmpty()) {
+            } else if (!message.media_reference.isNullOrEmpty()) {
                 // Regular Media Photo/Video
                 Box(
                     modifier = Modifier
@@ -785,7 +785,7 @@ fun ChatMessageBubble(
                 ) {
                     AsyncImage(
                         model = ImageRequest.Builder(context)
-                            .data(message.mediaUri)
+                            .data(message.media_reference)
                             .crossfade(true)
                             .build(),
                         contentDescription = "Media",
@@ -793,7 +793,7 @@ fun ChatMessageBubble(
                         modifier = Modifier.fillMaxSize()
                     )
 
-                    if (message.mediaType == "VIDEO") {
+                    if (message.message_type == "VIDEO") {
                         Icon(
                             imageVector = Icons.Default.PlayCircle,
                             contentDescription = "Video",

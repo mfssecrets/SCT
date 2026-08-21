@@ -61,7 +61,7 @@ import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.AuthRepository
-import com.example.data.local.UserEntity
+import com.example.data.SupabaseProfile
 import com.example.ui.theme.CleanShieldBlue
 import com.example.ui.theme.CleanShieldCyanBright
 import com.example.ui.theme.CleanShieldDarkNavy
@@ -87,7 +87,7 @@ fun CallScreen(
     val context = LocalContext.current
     val authRepo = remember { AuthRepository.getInstance(context) }
 
-    var partnerUser by remember { mutableStateOf<UserEntity?>(null) }
+    var partnerUser by remember { mutableStateOf<SupabaseProfile?>(null) }
     LaunchedEffect(partnerUsername) {
         partnerUser = authRepo.database.userDao().getUserByUsername(partnerUsername.trim().lowercase())
     }

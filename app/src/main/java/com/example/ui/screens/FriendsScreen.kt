@@ -70,7 +70,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.data.AuthRepository
 import com.example.data.SocialRepository
-import com.example.data.local.UserEntity
+import com.example.data.SupabaseProfile
 import com.example.ui.components.CleanShieldBottomNavBar
 import com.example.ui.components.CleanShieldTab
 import com.example.ui.components.CleanShieldTopHeader
@@ -104,9 +104,9 @@ fun FriendsScreen(
     var searchQuery by remember { mutableStateOf("") }
 
     // Dialog states
-    var userToUnfriend by remember { mutableStateOf<UserEntity?>(null) }
-    var userToBlock by remember { mutableStateOf<UserEntity?>(null) }
-    var userToReport by remember { mutableStateOf<UserEntity?>(null) }
+    var userToUnfriend by remember { mutableStateOf<SupabaseProfile?>(null) }
+    var userToBlock by remember { mutableStateOf<SupabaseProfile?>(null) }
+    var userToReport by remember { mutableStateOf<SupabaseProfile?>(null) }
 
     val filteredFriends = remember(friendsList, searchQuery) {
         val list = friendsList ?: emptyList()
@@ -393,7 +393,7 @@ fun FriendsScreen(
 
 @Composable
 fun FriendRowItem(
-    friend: UserEntity,
+    friend: SupabaseProfile,
     onChatClicked: () -> Unit,
     onUnfriendClicked: () -> Unit,
     onBlockClicked: () -> Unit,

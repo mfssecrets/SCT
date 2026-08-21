@@ -92,8 +92,8 @@ import coil.request.ImageRequest
 import com.example.data.AuthRepository
 import com.example.data.NotificationItemWithUser
 import com.example.data.SocialRepository
-import com.example.data.local.NotificationEntity
-import com.example.data.local.UserEntity
+import com.example.data.SupabaseNotification
+import com.example.data.SupabaseProfile
 import com.example.ui.theme.CleanShieldBlue
 import com.example.ui.theme.CleanShieldCardBorder
 import com.example.ui.theme.CleanShieldCyan
@@ -156,8 +156,8 @@ fun NotificationsScreen(
     // Confirmation Dialog for Accept
     if (pendingAcceptTarget != null) {
         val target = pendingAcceptTarget!!
-        val senderName = target.senderUser?.name?.ifBlank { null } ?: target.notification.senderUsername
-        val senderHandle = target.notification.senderUsername
+        val senderName = target.senderUser?.name?.ifBlank { null } ?: target.notification.sender_id
+        val senderHandle = target.notification.sender_id
 
         AlertDialog(
             onDismissRequest = { pendingAcceptTarget = null },
@@ -194,7 +194,7 @@ fun NotificationsScreen(
                             processingActionIds.add(notif.id)
                             try {
                                 val success = socialRepo.acceptFriendRequest(
-                                    requesterUsername = notif.senderUsername,
+                                    requesterUsername = notif.sender_id,
                                     recipientUsername = currentUsername
                                 )
                                 if (success) {
@@ -232,8 +232,8 @@ fun NotificationsScreen(
     // Confirmation Dialog for Reject
     if (pendingRejectTarget != null) {
         val target = pendingRejectTarget!!
-        val senderName = target.senderUser?.name?.ifBlank { null } ?: target.notification.senderUsername
-        val senderHandle = target.notification.senderUsername
+        val senderName = target.senderUser?.name?.ifBlank { null } ?: target.notification.sender_id
+        val senderHandle = target.notification.sender_id
 
         AlertDialog(
             onDismissRequest = { pendingRejectTarget = null },
@@ -270,7 +270,7 @@ fun NotificationsScreen(
                             processingActionIds.add(notif.id)
                             try {
                                 val success = socialRepo.declineFriendRequest(
-                                    requesterUsername = notif.senderUsername,
+                                    requesterUsername = notif.sender_id,
                                     recipientUsername = currentUsername
                                 )
                                 if (success) {
@@ -525,7 +525,7 @@ fun NotificationsScreen(
                                     }
                                 },
                                 onStartChatClick = {
-                                    onNavigateToChat(item.notification.senderUsername)
+                                    onNavigateToChat(item.notification.sender_id)
                                 },
                                 onDeleteClick = {
                                     scope.launch {
@@ -559,8 +559,8 @@ fun NotificationCardRow(
     val isRejected = notif.type == "REQUEST_REJECTED" || notif.status == "REJECTED"
     val isSecurityAlert = notif.type == "SECURITY_ALERT"
 
-    val senderDisplayName = sender?.name?.ifBlank { null } ?: notif.senderUsername
-    val senderHandle = notif.senderUsername
+    val senderDisplayName = sender?.name?.ifBlank { null } ?: notif.sender_id
+    val senderHandle = notif.sender_id
     val timeAgo = remember(notif.timestamp) { formatRelativeTime(notif.timestamp) }
 
     Card(
