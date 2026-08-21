@@ -56,6 +56,7 @@ import com.example.ui.components.CleanShieldEmptyState
 import com.example.ui.components.CleanShieldErrorView
 import com.example.ui.components.CleanShieldSkeletonList
 import com.example.ui.components.CleanShieldTopHeader
+import com.example.ui.components.OnlineStatusIndicator
 import com.example.ui.theme.CleanShieldBlue
 import com.example.ui.theme.CleanShieldCyan
 import com.example.ui.theme.CleanShieldSurface
@@ -198,31 +199,37 @@ fun InboxRowItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Friend Avatar
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(CircleShape)
-                .background(CleanShieldBlue.copy(alpha = 0.08f)),
-            contentAlignment = Alignment.Center
-        ) {
-            if (!friend.profilePhotoUri.isNullOrEmpty()) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(friend.profilePhotoUri)
-                        .crossfade(true)
+        Box(contentAlignment = Alignment.BottomEnd) {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(CleanShieldBlue.copy(alpha = 0.08f)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!friend.profilePhotoUri.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(friend.profilePhotoUri)
+                            .crossfade(true)
                         .build(),
-                    contentDescription = "Profile",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Text(
-                    text = friend.name.take(1).ifBlank { friend.username.take(1) }.uppercase(),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp,
-                    color = CleanShieldBlue
-                )
+                        contentDescription = "Profile",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Text(
+                        text = friend.name.take(1).ifBlank { friend.username.take(1) }.uppercase(),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        color = CleanShieldBlue
+                    )
+                }
             }
+            OnlineStatusIndicator(
+                isOnline = true,
+                modifier = Modifier.align(Alignment.BottomEnd)
+            )
         }
 
         Spacer(modifier = Modifier.width(14.dp))

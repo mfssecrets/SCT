@@ -1,6 +1,11 @@
 package com.example.ui.screens
 
 import android.widget.Toast
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +28,7 @@ import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -41,7 +47,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -138,15 +147,52 @@ fun SecurityDashboardScreen(
 
             Text(
                 text = "Run quick optimizations to keep your device safe and fast.",
-                color = CleanShieldTextDim,
+                color = Color(0xFF9CB8CC),
                 fontSize = 13.sp
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // System Protection Card
+            // ═══════════════════════════════════════════════
+            // System Protection Card with pulsing glow
+            // ═══════════════════════════════════════════════
+            val infiniteTransition = rememberInfiniteTransition(label = "dashboard_glow")
+            val glowPulse by infiniteTransition.animateFloat(
+                initialValue = 0.04f,
+                targetValue = 0.08f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1500),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "glow_pulse"
+            )
+            // Shimmer alpha for "100% Protected" text: pulses between 0.4 and 1.0
+            val shimmerAlpha by infiniteTransition.animateFloat(
+                initialValue = 0.4f,
+                targetValue = 1.0f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1500),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "shimmer_alpha"
+            )
+
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .drawBehind {
+                        // Subtle pulsing radial glow behind the card
+                        val glowColor = CleanShieldCyan.copy(alpha = glowPulse)
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(glowColor, Color.Transparent),
+                                center = Offset(size.width / 2f, size.height / 2f),
+                                radius = size.width / 1.5f
+                            ),
+                            radius = size.width / 1.2f,
+                            alpha = 1f
+                        )
+                    },
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = CleanShieldCardBg),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
@@ -168,7 +214,7 @@ fun SecurityDashboardScreen(
                                 text = "100% Protected",
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = CleanShieldGreen
+                                color = CleanShieldGreen.copy(alpha = shimmerAlpha)
                             )
                         }
                         Button(
@@ -237,6 +283,55 @@ fun SecurityDashboardScreen(
                 }
             )
 
+            // ═══════════════════════════════════════════════
+            // Data Retention Policy Card
+            // ═══════════════════════════════════════════════
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = CleanShieldCardBg),
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(CleanShieldBlue.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Shield,
+                            contentDescription = "Data Retention",
+                            tint = CleanShieldBlue,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Data Retention Policy",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = Color(0xFFD0E4F0)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "All messages are securely retained for 30 days per compliance requirements.",
+                            fontSize = 12.sp,
+                            color = CleanShieldTextDim
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
@@ -285,7 +380,7 @@ private fun OptimizerActionRow(
                     text = title,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
-                    color = CleanShieldTextMuted
+                    color = Color(0xFFD0E4F0)
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(

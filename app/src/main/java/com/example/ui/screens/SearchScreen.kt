@@ -80,6 +80,7 @@ fun SearchScreen(
     onLogoutClicked: () -> Unit,
     onMessengerClicked: () -> Unit,
     onNotificationClicked: () -> Unit,
+    onSettingsClicked: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -139,6 +140,7 @@ fun SearchScreen(
                 onLogoutClicked = onLogoutClicked,
                 onMessengerClicked = onMessengerClicked,
                 onNotificationClicked = onNotificationClicked,
+                onSettingsClicked = onSettingsClicked,
                 unreadNotificationsCount = unreadNotifsCount
             )
         },

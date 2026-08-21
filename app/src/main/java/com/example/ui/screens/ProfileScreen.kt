@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QuestionAnswer
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -101,6 +102,7 @@ fun ProfileScreen(
     onNavigateToFriends: () -> Unit = {},
     onNavigateToVault: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
+    onSettingsClicked: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -295,8 +297,20 @@ fun ProfileScreen(
                         fontWeight = FontWeight.Bold
                     )
 
-                    // Messenger + Notification Icons on Right
+                    // Settings + Messenger + Notification Icons on Right
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = onSettingsClicked,
+                            modifier = Modifier.testTag("settings_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+
                         IconButton(
                             onClick = onMessengerClicked,
                             modifier = Modifier.testTag("messenger_button")

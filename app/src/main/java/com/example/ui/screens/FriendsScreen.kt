@@ -75,6 +75,17 @@ import com.example.ui.theme.CleanShieldBlue
 import com.example.ui.theme.CleanShieldCyanBright
 import com.example.ui.theme.CleanShieldDarkNavy
 import com.example.ui.theme.CleanShieldError
+import com.example.ui.theme.CleanShieldSurfaceBorder
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.example.ui.components.CleanShieldAlertDialog
+import com.example.ui.components.CleanShieldEmptyState
+import com.example.ui.components.CleanShieldReportDialog
+import com.example.ui.components.OnlineStatusIndicator
 import kotlinx.coroutines.launch
 
 @Composable
@@ -85,6 +96,7 @@ fun FriendsScreen(
     onLogoutClicked: () -> Unit,
     onMessengerClicked: () -> Unit,
     onNotificationClicked: () -> Unit,
+    onSettingsClicked: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -145,6 +157,7 @@ fun FriendsScreen(
                 onLogoutClicked = onLogoutClicked,
                 onMessengerClicked = onMessengerClicked,
                 onNotificationClicked = onNotificationClicked,
+                onSettingsClicked = onSettingsClicked,
                 unreadNotificationsCount = unreadNotifsCount
             )
         },
@@ -258,43 +271,11 @@ fun FriendsScreen(
                     CleanShieldSkeletonList(itemCount = 6)
                 } else if (filteredFriends.isEmpty()) {
                     // Empty State
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(
-                                modifier = Modifier
-                                    .size(72.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFF0F7FA)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Group,
-                                    contentDescription = null,
-                                    tint = CleanShieldBlue,
-                                    modifier = Modifier.size(36.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = if (searchQuery.isNotEmpty()) "No friends match '$searchQuery'" else "No friends yet",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = CleanShieldDarkNavy
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = if (searchQuery.isNotEmpty()) "Check spelling or search for another username." else "Use the Search tab to find users by username and send friend requests.",
-                                fontSize = 13.sp,
-                                color = Color.Gray,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
-                    }
+                    CleanShieldEmptyState(
+                        icon = Icons.Default.Group,
+                        title = if (searchQuery.isNotEmpty()) "No friends match '$searchQuery'" else "No friends yet",
+                        subtitle = if (searchQuery.isNotEmpty()) "Check spelling or search for another username." else "Use the Search tab to find users by username and send friend requests."
+                    )
                 } else {
                     LazyColumn(
                         modifier = Modifier
@@ -303,14 +284,43 @@ fun FriendsScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(bottom = 16.dp)
                     ) {
-                        items(filteredFriends, key = { it.id }) { friend ->
-                            FriendRowItem(
-                                friend = friend,
-                                onChatClicked = { onNavigateToChat(friend.username) },
-                                onUnfriendClicked = { userToUnfriend = friend },
-                                onBlockClicked = { userToBlock = friend },
-                                onReportClicked = { userToReport = friend }
-                            )
+                        itemsIndexed(filteredFriends, key = { _, friend -> friend.id }) { index, friend ->
+                            AnimatedVisibility(
+                                visible = true,
+                                enter = slideInHorizontally(
+                                    initialOffsetX = { fullWidth -> (fullWidth * 0.25f).toInt() },
+                                    animationSpec = tween(
+                                        durationMillis = 350,
+                                        delayMillis = index * 50,
+                                        easing = FastOutSlowInEasing
+                                    )
+                                ) + fadeIn(
+                                    animationSpec = tween(
+                                        durationMillis = 300,
+                                        delayMillis = index * 50,
+                                        easing = FastOutSlowInEasing
+                                    )
+                                )
+                            ) {
+                                Column {
+                                    FriendRowItem(
+                                        friend = friend,
+                                        onChatClicked = { onNavigateToChat(friend.username) },
+                                        onUnfriendClicked = { userToUnfriend = friend },
+                                        onBlockClicked = { userToBlock = friend },
+                                        onReportClicked = { userToReport = friend }
+                                    )
+                                    if (index < filteredFriends.size - 1) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp)
+                                                .height(1.dp)
+                                                .background(CleanShieldSurfaceBorder)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -321,87 +331,53 @@ fun FriendsScreen(
     // Unfriend Confirmation Dialog
     if (userToUnfriend != null) {
         val target = userToUnfriend!!
-        AlertDialog(
-            onDismissRequest = { userToUnfriend = null },
-            title = { Text("Unfriend @${target.username}?", fontWeight = FontWeight.Bold) },
-            text = { Text("Are you sure you want to remove ${target.name.ifBlank { "@" + target.username }} from your friends list? You will no longer be able to message each other until a new request is accepted.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        scope.launch {
-                            socialRepo.unfriend(currentUsername, target.username)
-                            userToUnfriend = null
-                            Toast.makeText(context, "Unfriended @${target.username}", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CleanShieldError)
-                ) {
-                    Text("Unfriend")
+        CleanShieldAlertDialog(
+            title = "Unfriend @${target.username}?",
+            message = "Are you sure you want to remove ${target.name.ifBlank { "@" + target.username }} from your friends list? You will no longer be able to message each other until a new request is accepted.",
+            icon = Icons.Default.PersonRemove,
+            confirmColor = CleanShieldError,
+            confirmText = "Remove",
+            onConfirm = {
+                scope.launch {
+                    socialRepo.unfriend(currentUsername, target.username)
+                    Toast.makeText(context, "Unfriended @${target.username}", Toast.LENGTH_SHORT).show()
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { userToUnfriend = null }) {
-                    Text("Cancel")
-                }
-            }
+            onDismiss = { userToUnfriend = null }
         )
     }
 
     // Block Confirmation Dialog
     if (userToBlock != null) {
         val target = userToBlock!!
-        AlertDialog(
-            onDismissRequest = { userToBlock = null },
-            title = { Text("Block @${target.username}?", fontWeight = FontWeight.Bold) },
-            text = { Text("Are you sure you want to block ${target.name.ifBlank { "@" + target.username }}? They will not be able to message you, call you, or send friend requests. They will also be removed from your friends.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        scope.launch {
-                            socialRepo.blockUser(currentUsername, target.username)
-                            userToBlock = null
-                            Toast.makeText(context, "Blocked @${target.username}", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CleanShieldError)
-                ) {
-                    Text("Block")
+        CleanShieldAlertDialog(
+            title = "Block @${target.username}?",
+            message = "Are you sure you want to block ${target.name.ifBlank { "@" + target.username }}? They will not be able to message you, call you, or send friend requests. They will also be removed from your friends.",
+            icon = Icons.Default.Block,
+            confirmColor = CleanShieldError,
+            confirmText = "Block User",
+            onConfirm = {
+                scope.launch {
+                    socialRepo.blockUser(currentUsername, target.username)
+                    Toast.makeText(context, "Blocked @${target.username}", Toast.LENGTH_SHORT).show()
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { userToBlock = null }) {
-                    Text("Cancel")
-                }
-            }
+            onDismiss = { userToBlock = null }
         )
     }
 
     // Report Confirmation Dialog
     if (userToReport != null) {
         val target = userToReport!!
-        AlertDialog(
-            onDismissRequest = { userToReport = null },
-            title = { Text("Report @${target.username}", fontWeight = FontWeight.Bold) },
-            text = { Text("Submit a confidential security report for @${target.username} for investigation.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        scope.launch {
-                            socialRepo.reportUser(currentUsername, target.username, "Inappropriate activity")
-                            userToReport = null
-                            Toast.makeText(context, "Report submitted securely.", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = CleanShieldBlue)
-                ) {
-                    Text("Submit Report")
+        CleanShieldReportDialog(
+            targetUsername = target.username,
+            onReport = { reason, _ ->
+                scope.launch {
+                    socialRepo.reportUser(currentUsername, target.username, reason)
                 }
+                Toast.makeText(context, "Report submitted securely.", Toast.LENGTH_SHORT).show()
             },
-            dismissButton = {
-                TextButton(onClick = { userToReport = null }) {
-                    Text("Cancel")
-                }
-            }
+            onDismiss = { userToReport = null }
         )
     }
 }
@@ -428,31 +404,37 @@ fun FriendRowItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Profile Image
-        Box(
-            modifier = Modifier
-                .size(46.dp)
-                .clip(CircleShape)
-                .background(Color(0xFFE0F2FE)),
-            contentAlignment = Alignment.Center
-        ) {
-            if (!friend.profilePhotoUri.isNullOrEmpty()) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(friend.profilePhotoUri)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "Friend Photo",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                Text(
-                    text = friend.name.take(1).ifBlank { friend.username.take(1) }.uppercase(),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
-                    color = CleanShieldBlue
-                )
+        Box(contentAlignment = Alignment.BottomEnd) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE0F2FE)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!friend.profilePhotoUri.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(friend.profilePhotoUri)
+                            .crossfade(true)
+                            .build(),
+                        contentDescription = "Friend Photo",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Text(
+                        text = friend.name.take(1).ifBlank { friend.username.take(1) }.uppercase(),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        color = CleanShieldBlue
+                    )
+                }
             }
+            OnlineStatusIndicator(
+                isOnline = true,
+                modifier = Modifier.align(Alignment.BottomEnd)
+            )
         }
 
         Spacer(modifier = Modifier.width(12.dp))

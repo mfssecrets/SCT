@@ -3,18 +3,28 @@ package com.example.ui.screens
 import android.app.Activity
 import android.net.Uri
 import android.view.WindowManager
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,9 +58,12 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Visibility
@@ -79,6 +92,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -86,8 +100,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -113,6 +133,39 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+// ── Reply Content Parser ──
+private fun parseReplyContent(content: String): Triple<String, String, String>? {
+    if (!content.startsWith("↩ @")) return null
+    val newlineIndex = content.indexOf('\n')
+    if (newlineIndex == -1) return null
+    val replyLine = content.substring(0, newlineIndex)
+    val actualContent = content.substring(newlineIndex + 1)
+    val match = Regex("^↩ @(\\S+): \"(.*)\"$").find(replyLine) ?: return null
+    return Triple(match.groupValues[1], match.groupValues[2], actualContent)
+}
+
+// ── Search Highlight Helper ──
+private fun highlightText(text: String, query: String, highlightColor: Color): AnnotatedString {
+    if (query.isBlank()) return AnnotatedString(text)
+    val builder = AnnotatedString.Builder()
+    var start = 0
+    val lowerText = text.lowercase()
+    val lowerQuery = query.lowercase()
+    while (true) {
+        val index = lowerText.indexOf(lowerQuery, start)
+        if (index == -1) {
+            builder.append(text.substring(start))
+            break
+        }
+        builder.append(text.substring(start, index))
+        builder.pushStyle(SpanStyle(background = highlightColor))
+        builder.append(text.substring(index, index + query.length))
+        builder.pop()
+        start = index + query.length
+    }
+    return builder.toAnnotatedString()
+}
 
 @Composable
 fun ChatScreen(
@@ -183,11 +236,38 @@ fun ChatScreen(
     var showClearChatDialog by remember { mutableStateOf(false) }
     var showBlockDialog by remember { mutableStateOf(false) }
     var viewingOneShotMessage by remember { mutableStateOf<SupabaseMessage?>(null) }
+    var longPressedMessage by remember { mutableStateOf<SupabaseMessage?>(null) }
+    var replyingTo by remember { mutableStateOf<SupabaseMessage?>(null) }
+
+    // ═══ Chat Search states ═══
+    var isSearchMode by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    val searchHighlightColor = remember { CleanShieldCyan.copy(alpha = 0.3f) }
+    val filteredMessages = remember(messagesList, searchQuery) {
+        if (searchQuery.isBlank()) messagesList
+        else messagesList.filter { msg ->
+            msg.content?.contains(searchQuery, ignoreCase = true) == true
+        }
+    }
+    val matchCount = remember(messagesList, searchQuery) {
+        if (searchQuery.isBlank()) 0
+        else messagesList.count { msg ->
+            msg.content?.contains(searchQuery, ignoreCase = true) == true
+        }
+    }
 
     val listState = rememberLazyListState()
 
+    // Auto-dismiss long-press action bar after 4 seconds
+    LaunchedEffect(longPressedMessage) {
+        if (longPressedMessage != null) {
+            delay(4000L)
+            longPressedMessage = null
+        }
+    }
+
     LaunchedEffect(messagesList.size) {
-        if (messagesList.isNotEmpty()) {
+        if (messagesList.isNotEmpty() && !isSearchMode) {
             listState.animateScrollToItem(messagesList.size - 1)
         }
     }
@@ -350,6 +430,17 @@ fun ChatScreen(
                         Icon(Icons.Default.Videocam, contentDescription = "Video Call", tint = Color.White)
                     }
 
+                    // Search
+                    IconButton(
+                        onClick = {
+                            isSearchMode = !isSearchMode
+                            if (!isSearchMode) searchQuery = ""
+                        },
+                        modifier = Modifier.testTag("chat_search_button")
+                    ) {
+                        Icon(Icons.Default.Search, contentDescription = "Search Messages", tint = Color.White)
+                    }
+
                     // 3-dot Menu
                     Box {
                         IconButton(
@@ -447,7 +538,126 @@ fun ChatScreen(
                 )
             }
 
+            // ═══ Search Bar (animated) ═══
+            AnimatedVisibility(
+                visible = isSearchMode,
+                enter = slideInVertically(tween(250)) { -it } + fadeIn(tween(250)),
+                exit = slideOutVertically(tween(200)) { -it } + fadeOut(tween(200))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    // Search input row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp)
+                                .testTag("chat_search_input"),
+                            placeholder = { Text("Search messages...", fontSize = 13.sp, color = Color.Gray) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null,
+                                    tint = CleanShieldBlue,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { searchQuery = "" }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Clear",
+                                            tint = Color.Gray,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CleanShieldBlue,
+                                unfocusedBorderColor = Color(0xFFD0D7DE),
+                                focusedContainerColor = Color(0xFFF8FAFC),
+                                unfocusedContainerColor = Color(0xFFF8FAFC)
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Close search button
+                        IconButton(
+                            onClick = {
+                                isSearchMode = false
+                                searchQuery = ""
+                            },
+                            modifier = Modifier.testTag("chat_search_close_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close Search",
+                                tint = CleanShieldTextMuted
+                            )
+                        }
+                    }
+
+                    // Match count
+                    if (searchQuery.isNotBlank()) {
+                        Text(
+                            text = if (matchCount > 0) "$matchCount message${if (matchCount != 1) "s" else ""} found" else "No messages found",
+                            fontSize = 12.sp,
+                            color = if (matchCount > 0) CleanShieldBlue else CleanShieldTextMuted,
+                            modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                        )
+                    }
+
+                    // Divider
+                    Spacer(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(Color(0xFFE2E8F0))
+                    )
+                }
+            }
+
             // Messages LazyColumn
+            val displayMessages = if (isSearchMode && searchQuery.isNotBlank()) filteredMessages else messagesList
+
+            if (isSearchMode && searchQuery.isNotBlank() && filteredMessages.isEmpty()) {
+                // No messages found in search
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            tint = CleanShieldTextMuted,
+                            modifier = Modifier.size(40.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "No messages found",
+                            fontSize = 14.sp,
+                            color = CleanShieldTextMuted
+                        )
+                    }
+                }
+            } else {
             LazyColumn(
                 state = listState,
                 modifier = Modifier
@@ -459,56 +669,120 @@ fun ChatScreen(
             ) {
                 // Date separator helper
                 val dayFormat = SimpleDateFormat("MMMM d, yyyy", Locale.getDefault())
-                messagesList.forEachIndexed { index, msg ->
+                displayMessages.forEachIndexed { index, msg ->
                     val currentDate = dayFormat.format(Date(msg.sentAtMillis))
-                    val prevDate = if (index > 0) dayFormat.format(Date(messagesList[index - 1].sentAtMillis)) else null
+                    val prevDate = if (index > 0) dayFormat.format(Date(displayMessages[index - 1].sentAtMillis)) else null
                     if (currentDate != prevDate) {
-                        item(key = "date_$index") {
+                        item(key = "date_${msg.id}_$index") {
                             ChatDateSeparator(dateText = currentDate)
                         }
                     }
                     item(key = msg.id) {
                         val isMine = msg.sender_id.equals(currentUsername, ignoreCase = true)
-                        ChatMessageBubble(
-                            message = msg,
-                            isMine = isMine,
-                            onOneShotClicked = {
-                                if (!msg.one_shot_opened) {
-                                    viewingOneShotMessage = msg
-                                }
-                            },
-                            onRetry = {
-                                if (msg.status == "FAILED") {
-                                    scope.launch {
-                                        val retryContent = msg.content ?: ""
-                                        val isMedia = !msg.media_reference.isNullOrEmpty()
-                                        val (success, error) = chatRepo.sendMessage(
-                                            sender = currentUsername,
-                                            receiver = partnerUsername,
-                                            content = retryContent,
-                                            mediaUri = null,
-                                            mediaType = if (isMedia) msg.message_type else "TEXT"
-                                        )
-                                        if (success) {
-                                            // Delete the failed message locally
-                                            triggerTypingIndicator()
-                                        } else {
-                                            Toast.makeText(context, error ?: "Retry failed", Toast.LENGTH_SHORT).show()
+                        Box {
+                            ChatMessageBubble(
+                                message = msg,
+                                isMine = isMine,
+                                searchQuery = if (isSearchMode) searchQuery else "",
+                                searchHighlightColor = searchHighlightColor,
+                                onLongPress = { longPressedMessage = msg },
+                                onOneShotClicked = {
+                                    if (!msg.one_shot_opened) {
+                                        viewingOneShotMessage = msg
+                                    }
+                                },
+                                onRetry = {
+                                    if (msg.status == "FAILED") {
+                                        scope.launch {
+                                            val retryContent = msg.content ?: ""
+                                            val isMedia = !msg.media_reference.isNullOrEmpty()
+                                            val (success, error) = chatRepo.sendMessage(
+                                                sender = currentUsername,
+                                                receiver = partnerUsername,
+                                                content = retryContent,
+                                                mediaUri = null,
+                                                mediaType = if (isMedia) msg.message_type else "TEXT"
+                                            )
+                                            if (success) {
+                                                // Delete the failed message locally
+                                                triggerTypingIndicator()
+                                            } else {
+                                                Toast.makeText(context, error ?: "Retry failed", Toast.LENGTH_SHORT).show()
+                                            }
                                         }
                                     }
                                 }
+                            )
+                            // ═══ Long-press action bar overlay ═══
+                            AnimatedVisibility(
+                                visible = longPressedMessage?.id == msg.id,
+                                enter = fadeIn(tween(150)),
+                                exit = fadeOut(tween(100))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(bottom = 8.dp)
+                                        .shadow(4.dp, RoundedCornerShape(24.dp))
+                                        .background(Color(0xFF1E293B), RoundedCornerShape(24.dp))
+                                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Reply button
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clip(CircleShape)
+                                            .background(CleanShieldBlue)
+                                            .clickable {
+                                                replyingTo = msg
+                                                longPressedMessage = null
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Reply,
+                                            contentDescription = "Reply",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    // Copy button
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clip(CircleShape)
+                                            .background(CleanShieldBlue)
+                                            .clickable {
+                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                                clipboard.setPrimaryClip(ClipData.newPlainText("message", msg.content ?: ""))
+                                                Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                                                longPressedMessage = null
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.ContentCopy,
+                                            contentDescription = "Copy",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
                             }
-                        )
+                        }
                     }
                 }
 
                 // Typing indicator at the bottom
                 item {
-                    AnimatedVisibility(visible = showTypingIndicator) {
+                    AnimatedVisibility(visible = showTypingIndicator && !isSearchMode) {
                         TypingIndicator()
                     }
                 }
             }
+            } // end if/else for search empty state
 
             // Composer Area
             Column(
@@ -517,6 +791,55 @@ fun ChatScreen(
                     .background(Color.White)
                     .padding(8.dp)
             ) {
+                // ═══ Reply preview bar ═══
+                AnimatedVisibility(
+                    visible = replyingTo != null,
+                    enter = slideInVertically(tween(200)) { it } + fadeIn(tween(200)),
+                    exit = slideOutVertically(tween(150)) { it } + fadeOut(tween(150))
+                ) {
+                    replyingTo?.let { replyMsg ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFF0F4FF), RoundedCornerShape(8.dp))
+                                .border(1.dp, CleanShieldBlue.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(3.dp)
+                                    .height(32.dp)
+                                    .background(CleanShieldBlue, RoundedCornerShape(2.dp))
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Replying to @${replyMsg.sender_id}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CleanShieldBlue
+                                )
+                                Text(
+                                    text = (replyMsg.content ?: "").take(50),
+                                    fontSize = 12.sp,
+                                    color = CleanShieldTextMuted,
+                                    fontStyle = FontStyle.Italic,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            IconButton(
+                                onClick = { replyingTo = null },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Cancel Reply", tint = CleanShieldTextMuted, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+
                 // One-Shot indicator banner
                 if (isOneShotMode) {
                     Row(
@@ -593,12 +916,17 @@ fun ChatScreen(
                             if (textMessage.isNotBlank() && !isSending) {
                                 isSending = true
                                 val sendingText = textMessage.trim()
+                                val replyPrefix = if (replyingTo != null) {
+                                    val preview = (replyingTo!!.content ?: "").take(50)
+                                    "↩ @${replyingTo!!.sender_id}: \"$preview\"\n"
+                                } else ""
                                 textMessage = ""
+                                replyingTo = null
                                 scope.launch {
                                     val (success, error) = chatRepo.sendMessage(
                                         sender = currentUsername,
                                         receiver = partnerUsername,
-                                        content = sendingText,
+                                        content = replyPrefix + sendingText,
                                         mediaUri = null,
                                         mediaType = "TEXT"
                                     )
@@ -793,10 +1121,14 @@ fun ChatScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChatMessageBubble(
     message: SupabaseMessage,
     isMine: Boolean,
+    searchQuery: String = "",
+    searchHighlightColor: Color = Color.Transparent,
+    onLongPress: () -> Unit = {},
     onOneShotClicked: () -> Unit,
     onRetry: () -> Unit
 ) {
@@ -822,6 +1154,11 @@ fun ChatMessageBubble(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onLongClick = onLongPress
+            )
             .padding(vertical = 2.dp),
         horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
     ) {
@@ -991,8 +1328,60 @@ fun ChatMessageBubble(
                 )
             } else {
                 // ── Text Message ──
+                val replyInfo = parseReplyContent(message.content ?: "")
+
+                // Reply header
+                if (replyInfo != null) {
+                    val (replySender, replyPreview, _) = replyInfo
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp)
+                            .border(
+                                width = 1.dp,
+                                color = if (isMine) Color.White.copy(alpha = 0.4f) else CleanShieldBlue.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(2.dp)
+                                .height(20.dp)
+                                .background(
+                                    if (isMine) Color.White.copy(alpha = 0.6f) else CleanShieldBlue,
+                                    RoundedCornerShape(1.dp)
+                                )
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Column {
+                            Text(
+                                text = "@$replySender",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isMine) Color.White.copy(alpha = 0.85f) else CleanShieldBlue
+                            )
+                            Text(
+                                text = replyPreview,
+                                fontSize = 10.sp,
+                                color = if (isMine) Color.White.copy(alpha = 0.65f) else CleanShieldTextMuted,
+                                fontStyle = FontStyle.Italic,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                }
+
+                val actualText = replyInfo?.third ?: (message.content ?: "")
+                val displayText = if (searchQuery.isNotBlank()) {
+                    highlightText(actualText, searchQuery, searchHighlightColor)
+                } else {
+                    AnnotatedString(actualText)
+                }
                 Text(
-                    text = message.content ?: "",
+                    text = displayText,
                     fontSize = 14.sp,
                     color = if (isFailed) CleanShieldError else if (isMine) Color.White else CleanShieldTextPrimary
                 )

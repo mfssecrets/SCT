@@ -38,6 +38,7 @@ import com.example.ui.screens.PrivateVaultScreen
 import com.example.ui.screens.ProfileScreen
 import com.example.ui.screens.SearchScreen
 import com.example.ui.screens.SecurityDashboardScreen
+import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.SignInScreen
 import com.example.ui.screens.SignUpScreen
 import com.example.ui.theme.MyApplicationTheme
@@ -62,6 +63,7 @@ sealed interface AppScreen {
     data object PrivateVault : AppScreen
     data object Search : AppScreen
     data object Notifications : AppScreen
+    data object Settings : AppScreen
     data object Inbox : AppScreen
     data class Chat(val partnerUsername: String) : AppScreen
     data class AudioCall(val partnerUsername: String) : AppScreen
@@ -125,6 +127,7 @@ fun CleanShieldApp(
             is AppScreen.PrivateVault -> currentScreen = AppScreen.Profile
             is AppScreen.Search -> currentScreen = AppScreen.Profile
             is AppScreen.Notifications -> currentScreen = AppScreen.Profile
+            is AppScreen.Settings -> currentScreen = AppScreen.Profile
             is AppScreen.Inbox -> currentScreen = AppScreen.Profile
             is AppScreen.Chat -> currentScreen = AppScreen.Inbox
             is AppScreen.AudioCall -> {
@@ -320,6 +323,9 @@ fun CleanShieldApp(
                     },
                     onNavigateToSearch = {
                         currentScreen = AppScreen.Search
+                    },
+                    onSettingsClicked = {
+                        currentScreen = AppScreen.Settings
                     }
                 )
             }
@@ -342,6 +348,9 @@ fun CleanShieldApp(
                     },
                     onNavigateToBlockedUsers = {
                         currentScreen = AppScreen.BlockedUsers
+                    },
+                    onSettingsClicked = {
+                        currentScreen = AppScreen.Settings
                     }
                 )
             }
@@ -382,6 +391,9 @@ fun CleanShieldApp(
                     },
                     onNotificationClicked = {
                         currentScreen = AppScreen.Notifications
+                    },
+                    onSettingsClicked = {
+                        currentScreen = AppScreen.Settings
                     }
                 )
             }
@@ -440,6 +452,12 @@ fun CleanShieldApp(
                     onEndCall = {
                         currentScreen = AppScreen.Chat(screen.partnerUsername)
                     }
+                )
+            }
+
+            is AppScreen.Settings -> {
+                SettingsScreen(
+                    onNavigateBack = { currentScreen = AppScreen.Profile }
                 )
             }
         }
