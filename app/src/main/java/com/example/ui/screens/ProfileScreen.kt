@@ -227,6 +227,16 @@ fun ProfileScreen(
         }
 
         isSaving = true
+
+        // Show upload progress if a new photo (content:// URI) was selected
+        val isNewPhoto = !photoUriString.isNullOrEmpty() &&
+            photoUriString.startsWith("content://") &&
+            photoUriString != currentSession?.profilePhotoUri
+        if (isNewPhoto) {
+            isUploadingPhoto = true
+            photoUploadProgress = 0.5f
+        }
+
         scope.launch {
             val (success, error) = repository.updateUserProfile(
                 userId = userId,
@@ -236,6 +246,7 @@ fun ProfileScreen(
                 photoUri = photoUriString
             )
             isSaving = false
+            isUploadingPhoto = false
             if (success) {
                 Toast.makeText(context, "Profile updated successfully!", Toast.LENGTH_SHORT).show()
                 snackbarHostState.showSnackbar("Profile saved successfully")

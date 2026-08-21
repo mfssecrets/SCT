@@ -1,7 +1,11 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,20 +20,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.Badge
-import androidx.compose.material3.Icon
+import androidx.compose.material.icons.filled.QuestionAnswer
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,6 +37,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -52,11 +52,16 @@ import coil.request.ImageRequest
 import com.example.data.AuthRepository
 import com.example.data.ChatRepository
 import com.example.data.InboxConversation
+import com.example.ui.components.CleanShieldEmptyState
 import com.example.ui.components.CleanShieldErrorView
 import com.example.ui.components.CleanShieldSkeletonList
 import com.example.ui.components.CleanShieldTopHeader
 import com.example.ui.theme.CleanShieldBlue
-import com.example.ui.theme.CleanShieldDarkNavy
+import com.example.ui.theme.CleanShieldCyan
+import com.example.ui.theme.CleanShieldSurface
+import com.example.ui.theme.CleanShieldTextHint
+import com.example.ui.theme.CleanShieldTextPrimary
+import com.example.ui.theme.CleanShieldTextSecondary
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -93,7 +98,7 @@ fun InboxScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color.White)
+                .background(CleanShieldSurface)
         ) {
             if (inboxList == null) {
                 // Skeleton loading state
@@ -104,55 +109,41 @@ fun InboxScreen(
                     onRetry = { hasError = false }
                 )
             } else if (inboxList!!.isEmpty()) {
-                // Empty state
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            modifier = Modifier
-                                .size(72.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFFF0F9FF)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Chat,
-                                contentDescription = null,
-                                tint = CleanShieldBlue,
-                                modifier = Modifier.size(36.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "No Conversations Yet",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = CleanShieldDarkNavy
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Add friends from the Search tab or start a conversation from your Friends list.",
-                            fontSize = 13.sp,
-                            color = Color.Gray,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                    }
-                }
+                // Empty state – shared component
+                CleanShieldEmptyState(
+                    icon = Icons.Default.QuestionAnswer,
+                    title = "No Conversations Yet",
+                    subtitle = "No conversations yet. Search for users and start chatting!"
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
-                    items(inboxList!!, key = { it.friend.id }) { conv ->
-                        InboxRowItem(
-                            conversation = conv,
-                            currentUsername = currentUsername,
-                            onClick = { onNavigateToChat(conv.friend.username) }
-                        )
+                    itemsIndexed(inboxList!!, key = { _, conv -> conv.friend.id }) { index, conv ->
+                        AnimatedVisibility(
+                            visible = true,
+                            enter = slideInHorizontally(
+                                initialOffsetX = { fullWidth -> (fullWidth * 0.25f).toInt() },
+                                animationSpec = tween(
+                                    durationMillis = 350,
+                                    delayMillis = index * 60,
+                                    easing = FastOutSlowInEasing
+                                )
+                            ) + fadeIn(
+                                animationSpec = tween(
+                                    durationMillis = 300,
+                                    delayMillis = index * 60,
+                                    easing = FastOutSlowInEasing
+                                )
+                            )
+                        ) {
+                            InboxRowItem(
+                                conversation = conv,
+                                currentUsername = currentUsername,
+                                onClick = { onNavigateToChat(conv.friend.username) }
+                            )
+                        }
                     }
                 }
             }
@@ -169,17 +160,21 @@ fun InboxRowItem(
     val context = LocalContext.current
     val friend = conversation.friend
     val lastMsg = conversation.lastMessage
+    val hasUnread = conversation.unreadCount > 0
 
     val timeFormatted = remember(lastMsg?.timestamp) {
         if (lastMsg == null) ""
         else {
-            val date = Date(lastMsg.timestamp)
             val now = System.currentTimeMillis()
             val diff = now - lastMsg.timestamp
-            if (diff < 24 * 60 * 60 * 1000) {
-                SimpleDateFormat("h:mm a", Locale.getDefault()).format(date)
-            } else {
-                SimpleDateFormat("MMM d", Locale.getDefault()).format(date)
+            val minutes = diff / (60 * 1000)
+            val hours = diff / (60 * 60 * 1000)
+            val date = Date(lastMsg.timestamp)
+            when {
+                diff < 60 * 1000 -> "Just now"
+                minutes < 60 -> "${minutes}m ago"
+                hours < 24 -> "${hours}h ago"
+                else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(date)
             }
         }
     }
@@ -188,6 +183,16 @@ fun InboxRowItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
+            .drawBehind {
+                // Subtle left border accent for unread conversations
+                if (hasUnread) {
+                    drawRect(
+                        color = CleanShieldCyan,
+                        size = androidx.compose.ui.geometry.Size(3.dp.toPx(), size.height)
+                    )
+                }
+            }
+            .padding(start = if (hasUnread) 0.dp else 3.dp)
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .testTag("inbox_item_${friend.username}"),
         verticalAlignment = Alignment.CenterVertically
@@ -197,7 +202,7 @@ fun InboxRowItem(
             modifier = Modifier
                 .size(52.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFE0F2FE)),
+                .background(CleanShieldBlue.copy(alpha = 0.08f)),
             contentAlignment = Alignment.Center
         ) {
             if (!friend.profilePhotoUri.isNullOrEmpty()) {
@@ -233,14 +238,14 @@ fun InboxRowItem(
                     text = friend.name.ifBlank { "@${friend.username}" },
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
-                    color = CleanShieldDarkNavy
+                    color = CleanShieldTextPrimary
                 )
 
                 if (timeFormatted.isNotEmpty()) {
                     Text(
                         text = timeFormatted,
                         fontSize = 11.sp,
-                        color = Color.Gray
+                        color = if (hasUnread) CleanShieldBlue else CleanShieldTextHint
                     )
                 }
             }
@@ -261,7 +266,7 @@ fun InboxRowItem(
                         Icon(
                             imageVector = if (lastMsg.status == "SEEN") Icons.Default.DoneAll else Icons.Default.Check,
                             contentDescription = null,
-                            tint = if (lastMsg.status == "SEEN") CleanShieldBlue else Color.Gray,
+                            tint = if (lastMsg.status == "SEEN") CleanShieldBlue else CleanShieldTextHint,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -279,22 +284,34 @@ fun InboxRowItem(
                     Text(
                         text = previewText,
                         fontSize = 13.sp,
-                        color = if (conversation.unreadCount > 0) CleanShieldDarkNavy else Color.Gray,
-                        fontWeight = if (conversation.unreadCount > 0) FontWeight.Bold else FontWeight.Normal,
+                        color = if (hasUnread) CleanShieldTextPrimary else CleanShieldTextSecondary,
+                        fontWeight = if (hasUnread) FontWeight.SemiBold else FontWeight.Normal,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                // Unread Badge
-                if (conversation.unreadCount > 0) {
+                // Unread Badge – gradient pill (CleanShieldCyan → CleanShieldBlue)
+                if (hasUnread) {
                     Spacer(modifier = Modifier.width(8.dp))
-                    Badge(
-                        containerColor = CleanShieldBlue,
-                        contentColor = Color.White,
-                        modifier = Modifier.size(20.dp)
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .height(22.dp)
+                            .clip(RoundedCornerShape(11.dp))
+                            .background(
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(CleanShieldCyan, CleanShieldBlue)
+                                )
+                            )
+                            .padding(horizontal = 8.dp)
                     ) {
-                        Text("${conversation.unreadCount}", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "${conversation.unreadCount}",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                     }
                 }
             }

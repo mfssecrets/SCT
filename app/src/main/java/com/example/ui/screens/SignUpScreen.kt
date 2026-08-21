@@ -25,7 +25,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Email
@@ -34,8 +33,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,7 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -62,7 +60,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AuthRepository
@@ -70,13 +67,14 @@ import com.example.data.AuthResult
 import com.example.data.UsernameValidationResult
 import com.example.ui.components.SecurityShieldIcon
 import com.example.ui.theme.CleanShieldAmber
+import com.example.ui.theme.CleanShieldBlue
 import com.example.ui.theme.CleanShieldCardBg
 import com.example.ui.theme.CleanShieldCardBorder
-import com.example.ui.theme.CleanShieldCardInner
 import com.example.ui.theme.CleanShieldCyan
 import com.example.ui.theme.CleanShieldDarkNavy
 import com.example.ui.theme.CleanShieldDeepBg
 import com.example.ui.theme.CleanShieldGreen
+import com.example.ui.theme.CleanShieldRed
 import com.example.ui.theme.CleanShieldTextDim
 import com.example.ui.theme.CleanShieldTextMuted
 import com.example.ui.theme.CleanShieldTextWhite
@@ -111,6 +109,14 @@ fun SignUpScreen(
 
     var generalError by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+
+    // Password strength calculation
+    val passwordStrength = when {
+        password.isEmpty() -> null
+        password.length < 6 -> Triple("Weak", CleanShieldRed, 0.25f)
+        password.length < 10 -> Triple("Medium", CleanShieldAmber, 0.55f)
+        else -> Triple("Strong", CleanShieldGreen, 1f)
+    }
 
     // Real-time Instagram-format username checker with debounce
     fun checkUsername(input: String) {
@@ -237,6 +243,25 @@ fun SignUpScreen(
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // Shield branding icon at top of form
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(CleanShieldCyan.copy(alpha = 0.12f))
+                        .border(1.dp, CleanShieldCyan.copy(alpha = 0.3f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Shield,
+                        contentDescription = null,
+                        tint = CleanShieldCyan,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Text(
                     text = "Create Account",
                     color = CleanShieldTextWhite,
@@ -276,8 +301,20 @@ fun SignUpScreen(
                                 text = generalError ?: "",
                                 color = CleanShieldAmber,
                                 fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f)
                             )
+                            IconButton(
+                                onClick = { generalError = null },
+                                modifier = Modifier.size(20.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Dismiss",
+                                    tint = CleanShieldAmber,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
@@ -301,6 +338,7 @@ fun SignUpScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .border(1.dp, CleanShieldCardBorder, RoundedCornerShape(14.dp))
                         .testTag("signup_username_input"),
                     shape = RoundedCornerShape(14.dp),
                     placeholder = { Text("e.g. alex_shield.01", color = CleanShieldTextMuted) },
@@ -323,7 +361,7 @@ fun SignUpScreen(
                                 imageVector = if (isUsernameValid) Icons.Default.CheckCircle else Icons.Default.Close,
                                 contentDescription = null,
                                 tint = if (isUsernameValid) CleanShieldGreen else CleanShieldAmber,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     },
@@ -372,6 +410,7 @@ fun SignUpScreen(
                     onValueChange = { email = it },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .border(1.dp, CleanShieldCardBorder, RoundedCornerShape(14.dp))
                         .testTag("signup_email_input"),
                     shape = RoundedCornerShape(14.dp),
                     placeholder = { Text("name@example.com", color = CleanShieldTextMuted) },
@@ -415,6 +454,7 @@ fun SignUpScreen(
                     onValueChange = { password = it },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .border(1.dp, CleanShieldCardBorder, RoundedCornerShape(14.dp))
                         .testTag("signup_password_input"),
                     shape = RoundedCornerShape(14.dp),
                     placeholder = { Text("Enter password", color = CleanShieldTextMuted) },
@@ -453,6 +493,34 @@ fun SignUpScreen(
                     )
                 )
 
+                // Password strength indicator
+                if (passwordStrength != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(CleanShieldCardBorder.copy(alpha = 0.4f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .height(4.dp)
+                                .fillMaxWidth(fraction = passwordStrength.third)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(passwordStrength.second)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = passwordStrength.first,
+                        color = passwordStrength.second,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(start = 6.dp)
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // 4. Confirm Password Field
@@ -468,6 +536,7 @@ fun SignUpScreen(
                     onValueChange = { confirmPassword = it },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .border(1.dp, CleanShieldCardBorder, RoundedCornerShape(14.dp))
                         .testTag("signup_confirm_password_input"),
                     shape = RoundedCornerShape(14.dp),
                     placeholder = { Text("Re-enter password", color = CleanShieldTextMuted) },
@@ -479,12 +548,21 @@ fun SignUpScreen(
                         )
                     },
                     trailingIcon = {
-                        IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                        if (confirmPassword.isNotEmpty() && confirmPassword == password) {
                             Icon(
-                                imageVector = if (confirmPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                contentDescription = if (confirmPasswordVisible) "Hide password" else "Show password",
-                                tint = CleanShieldTextDim
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Passwords match",
+                                tint = CleanShieldGreen,
+                                modifier = Modifier.size(20.dp)
                             )
+                        } else {
+                            IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                                Icon(
+                                    imageVector = if (confirmPasswordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = if (confirmPasswordVisible) "Hide password" else "Show password",
+                                    tint = CleanShieldTextDim
+                                )
+                            }
                         }
                     },
                     visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -508,31 +586,32 @@ fun SignUpScreen(
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                // Create Account Button
-                Button(
-                    onClick = { handleCreateAccount() },
-                    enabled = !isLoading,
+                // Create Account Button – gradient (CleanShieldCyan → CleanShieldBlue)
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp)
+                        .clip(RoundedCornerShape(26.dp))
+                        .background(
+                            if (isLoading) CleanShieldCardBorder
+                            else Brush.horizontalGradient(colors = listOf(CleanShieldCyan, CleanShieldBlue))
+                        )
+                        .clickable(enabled = !isLoading) { handleCreateAccount() }
                         .testTag("create_account_button"),
-                    shape = RoundedCornerShape(26.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = CleanShieldCyan,
-                        contentColor = CleanShieldDarkNavy
-                    )
+                    contentAlignment = Alignment.Center
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(22.dp),
-                            color = CleanShieldDarkNavy,
+                            color = CleanShieldTextWhite,
                             strokeWidth = 2.5.dp
                         )
                     } else {
                         Text(
                             text = "Create Account",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
+                            fontSize = 16.sp,
+                            color = CleanShieldTextWhite
                         )
                     }
                 }

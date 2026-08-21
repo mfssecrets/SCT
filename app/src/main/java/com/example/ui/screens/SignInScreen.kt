@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -32,8 +33,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -54,7 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -63,19 +63,19 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AuthRepository
 import com.example.data.AuthResult
 import com.example.ui.components.SecurityShieldIcon
 import com.example.ui.theme.CleanShieldAmber
+import com.example.ui.theme.CleanShieldBlue
 import com.example.ui.theme.CleanShieldCardBg
 import com.example.ui.theme.CleanShieldCardBorder
 import com.example.ui.theme.CleanShieldCyan
+import androidx.compose.material.icons.filled.Refresh
 import com.example.ui.theme.CleanShieldDarkNavy
 import com.example.ui.theme.CleanShieldDeepBg
-import com.example.ui.theme.CleanShieldGreen
 import com.example.ui.theme.CleanShieldTextDim
 import com.example.ui.theme.CleanShieldTextMuted
 import com.example.ui.theme.CleanShieldTextWhite
@@ -185,6 +185,25 @@ fun SignInScreen(
                     .padding(horizontal = 24.dp)
                     .verticalScroll(rememberScrollState())
             ) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Shield branding icon at top of form
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(CleanShieldCyan.copy(alpha = 0.12f))
+                        .border(1.dp, CleanShieldCyan.copy(alpha = 0.3f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Shield,
+                        contentDescription = null,
+                        tint = CleanShieldCyan,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
@@ -204,8 +223,8 @@ fun SignInScreen(
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                // Error message
-                if (generalError != null) {
+                // Error banner with dismiss button
+                AnimatedVisibility(visible = generalError != null) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -226,8 +245,20 @@ fun SignInScreen(
                                 text = generalError ?: "",
                                 color = CleanShieldAmber,
                                 fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f)
                             )
+                            IconButton(
+                                onClick = { generalError = null },
+                                modifier = Modifier.size(20.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Dismiss",
+                                    tint = CleanShieldAmber,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
@@ -246,6 +277,7 @@ fun SignInScreen(
                     onValueChange = { identifier = it },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .border(1.dp, CleanShieldCardBorder, RoundedCornerShape(14.dp))
                         .testTag("signin_identifier_input"),
                     shape = RoundedCornerShape(14.dp),
                     placeholder = { Text("username or name@example.com", color = CleanShieldTextMuted) },
@@ -305,6 +337,7 @@ fun SignInScreen(
                     onValueChange = { password = it },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .border(1.dp, CleanShieldCardBorder, RoundedCornerShape(14.dp))
                         .testTag("signin_password_input"),
                     shape = RoundedCornerShape(14.dp),
                     placeholder = { Text("Enter your password", color = CleanShieldTextMuted) },
@@ -345,31 +378,32 @@ fun SignInScreen(
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                // Sign In Button
-                Button(
-                    onClick = { handleSignIn() },
-                    enabled = !isLoading,
+                // Sign In Button – gradient (CleanShieldCyan → CleanShieldBlue)
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp)
+                        .clip(RoundedCornerShape(26.dp))
+                        .background(
+                            if (isLoading) CleanShieldCardBorder
+                            else Brush.horizontalGradient(colors = listOf(CleanShieldCyan, CleanShieldBlue))
+                        )
+                        .clickable(enabled = !isLoading) { handleSignIn() }
                         .testTag("signin_submit_button"),
-                    shape = RoundedCornerShape(26.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = CleanShieldCyan,
-                        contentColor = CleanShieldDarkNavy
-                    )
+                    contentAlignment = Alignment.Center
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(22.dp),
-                            color = CleanShieldDarkNavy,
+                            color = CleanShieldTextWhite,
                             strokeWidth = 2.5.dp
                         )
                     } else {
                         Text(
                             text = "Sign In",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
+                            fontSize = 16.sp,
+                            color = CleanShieldTextWhite
                         )
                     }
                 }
@@ -429,6 +463,7 @@ private fun ForgotPasswordSheet(
 
     var sheetError by remember { mutableStateOf<String?>(null) }
     var isProcessing by remember { mutableStateOf(false) }
+    var isResendingCode by remember { mutableStateOf(false) }
 
     val latestDispatchedOtp by repository.latestDispatchedOtp.collectAsState()
 
@@ -444,6 +479,20 @@ private fun ForgotPasswordSheet(
             isProcessing = false
             if (success) {
                 step = 2
+                Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            } else {
+                sheetError = msg
+            }
+        }
+    }
+
+    fun handleResendCode() {
+        sheetError = null
+        isResendingCode = true
+        scope.launch {
+            val (success, msg) = repository.sendPasswordResetOtp(resetEmail)
+            isResendingCode = false
+            if (success) {
                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
             } else {
                 sheetError = msg
@@ -515,12 +564,42 @@ private fun ForgotPasswordSheet(
             Spacer(modifier = Modifier.height(10.dp))
 
             if (sheetError != null) {
-                Text(
-                    text = sheetError ?: "",
-                    color = CleanShieldAmber,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(bottom = 10.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(CleanShieldAmber.copy(alpha = 0.15f))
+                        .border(1.dp, CleanShieldAmber, RoundedCornerShape(10.dp))
+                        .padding(10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = CleanShieldAmber,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = sheetError ?: "",
+                            color = CleanShieldAmber,
+                            fontSize = 12.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = { sheetError = null },
+                            modifier = Modifier.size(18.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = null,
+                                tint = CleanShieldAmber,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
             }
 
             if (step == 1) {
@@ -536,8 +615,18 @@ private fun ForgotPasswordSheet(
                     value = resetEmail,
                     onValueChange = { resetEmail = it },
                     placeholder = { Text("name@example.com", color = CleanShieldTextMuted) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, CleanShieldCardBorder, RoundedCornerShape(12.dp)),
                     shape = RoundedCornerShape(12.dp),
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Email,
+                            contentDescription = null,
+                            tint = CleanShieldCyan,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = CleanShieldTextWhite,
                         unfocusedTextColor = CleanShieldTextWhite,
@@ -549,22 +638,23 @@ private fun ForgotPasswordSheet(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                Button(
-                    onClick = { handleSendResetCode() },
-                    enabled = !isProcessing,
+                // Send Reset Code button – gradient
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = CleanShieldCyan,
-                        contentColor = CleanShieldDarkNavy
-                    )
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(
+                            if (isProcessing) CleanShieldCardBorder
+                            else Brush.horizontalGradient(colors = listOf(CleanShieldCyan, CleanShieldBlue))
+                        )
+                        .clickable(enabled = !isProcessing) { handleSendResetCode() },
+                    contentAlignment = Alignment.Center
                 ) {
                     if (isProcessing) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = CleanShieldDarkNavy)
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = CleanShieldTextWhite)
                     } else {
-                        Text("Send Reset Code", fontWeight = FontWeight.Bold)
+                        Text("Send Reset Code", fontWeight = FontWeight.Bold, color = CleanShieldTextWhite)
                     }
                 }
             } else {
@@ -592,7 +682,9 @@ private fun ForgotPasswordSheet(
                     value = resetOtp,
                     onValueChange = { if (it.length <= 6) resetOtp = it },
                     placeholder = { Text("6-digit Code", color = CleanShieldTextMuted) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, CleanShieldCardBorder, RoundedCornerShape(12.dp)),
                     shape = RoundedCornerShape(12.dp),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -610,8 +702,18 @@ private fun ForgotPasswordSheet(
                     value = newPassword,
                     onValueChange = { newPassword = it },
                     placeholder = { Text("New Password (min. 6 chars)", color = CleanShieldTextMuted) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, CleanShieldCardBorder, RoundedCornerShape(12.dp)),
                     shape = RoundedCornerShape(12.dp),
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = CleanShieldCyan,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
                     visualTransformation = PasswordVisualTransformation(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = CleanShieldTextWhite,
@@ -628,8 +730,18 @@ private fun ForgotPasswordSheet(
                     value = confirmNewPassword,
                     onValueChange = { confirmNewPassword = it },
                     placeholder = { Text("Confirm New Password", color = CleanShieldTextMuted) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, CleanShieldCardBorder, RoundedCornerShape(12.dp)),
                     shape = RoundedCornerShape(12.dp),
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = CleanShieldCyan,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
                     visualTransformation = PasswordVisualTransformation(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = CleanShieldTextWhite,
@@ -640,24 +752,61 @@ private fun ForgotPasswordSheet(
                     singleLine = true
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                Button(
-                    onClick = { handleResetPassword() },
-                    enabled = !isProcessing,
+                // Resend Code link
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (isResendingCode) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            color = CleanShieldCyan,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Sending...",
+                            color = CleanShieldTextDim,
+                            fontSize = 12.sp
+                        )
+                    } else {
+                        Text(
+                            text = "Didn't receive the code? ",
+                            color = CleanShieldTextDim,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            text = "Resend Code",
+                            color = CleanShieldCyan,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.clickable { handleResendCode() }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Update Password button – gradient
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = CleanShieldCyan,
-                        contentColor = CleanShieldDarkNavy
-                    )
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(
+                            if (isProcessing) CleanShieldCardBorder
+                            else Brush.horizontalGradient(colors = listOf(CleanShieldCyan, CleanShieldBlue))
+                        )
+                        .clickable(enabled = !isProcessing) { handleResetPassword() },
+                    contentAlignment = Alignment.Center
                 ) {
                     if (isProcessing) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = CleanShieldDarkNavy)
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = CleanShieldTextWhite)
                     } else {
-                        Text("Update Password", fontWeight = FontWeight.Bold)
+                        Text("Update Password", fontWeight = FontWeight.Bold, color = CleanShieldTextWhite)
                     }
                 }
             }

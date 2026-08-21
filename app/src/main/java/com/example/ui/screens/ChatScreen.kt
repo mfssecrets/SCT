@@ -7,6 +7,11 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,10 +21,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,10 +32,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shadow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -44,7 +49,8 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Visibility
@@ -74,12 +80,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -92,9 +100,14 @@ import com.example.data.SocialRepository
 import com.example.data.SupabaseMessage
 import com.example.data.SupabaseProfile
 import com.example.ui.theme.CleanShieldBlue
+import com.example.ui.theme.CleanShieldCyan
 import com.example.ui.theme.CleanShieldCyanBright
 import com.example.ui.theme.CleanShieldDarkNavy
 import com.example.ui.theme.CleanShieldError
+import com.example.ui.theme.CleanShieldSurfaceBorder
+import com.example.ui.theme.CleanShieldTextMuted
+import com.example.ui.theme.CleanShieldTextPrimary
+import com.example.ui.theme.CleanShieldTextSecondary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -162,6 +175,9 @@ fun ChatScreen(
     var isSending by remember { mutableStateOf(false) }
     var uploadProgress by remember { mutableStateOf(0f) }
 
+    // Typing indicator state
+    var showTypingIndicator by remember { mutableStateOf(false) }
+
     // Dialog & viewer states
     var menuExpanded by remember { mutableStateOf(false) }
     var showClearChatDialog by remember { mutableStateOf(false) }
@@ -210,8 +226,19 @@ fun ChatScreen(
                 isSending = false
                 if (!success) {
                     Toast.makeText(context, error ?: "Message failed", Toast.LENGTH_SHORT).show()
+                } else {
+                    triggerTypingIndicator()
                 }
             }
+        }
+    }
+
+    // Helper to trigger typing indicator after successful send
+    fun triggerTypingIndicator() {
+        showTypingIndicator = true
+        scope.launch {
+            delay(2000L)
+            showTypingIndicator = false
         }
     }
 
@@ -427,20 +454,59 @@ fun ChatScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .padding(horizontal = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(vertical = 12.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                contentPadding = PaddingValues(vertical = 8.dp)
             ) {
-                items(messagesList, key = { it.id }) { msg ->
-                    val isMine = msg.sender_id.equals(currentUsername, ignoreCase = true)
-                    ChatMessageBubble(
-                        message = msg,
-                        isMine = isMine,
-                        onOneShotClicked = {
-                            if (!msg.one_shot_opened) {
-                                viewingOneShotMessage = msg
-                            }
+                // Date separator helper
+                val dayFormat = SimpleDateFormat("MMMM d, yyyy", Locale.getDefault())
+                messagesList.forEachIndexed { index, msg ->
+                    val currentDate = dayFormat.format(Date(msg.sentAtMillis))
+                    val prevDate = if (index > 0) dayFormat.format(Date(messagesList[index - 1].sentAtMillis)) else null
+                    if (currentDate != prevDate) {
+                        item(key = "date_$index") {
+                            ChatDateSeparator(dateText = currentDate)
                         }
-                    )
+                    }
+                    item(key = msg.id) {
+                        val isMine = msg.sender_id.equals(currentUsername, ignoreCase = true)
+                        ChatMessageBubble(
+                            message = msg,
+                            isMine = isMine,
+                            onOneShotClicked = {
+                                if (!msg.one_shot_opened) {
+                                    viewingOneShotMessage = msg
+                                }
+                            },
+                            onRetry = {
+                                if (msg.status == "FAILED") {
+                                    scope.launch {
+                                        val retryContent = msg.content ?: ""
+                                        val isMedia = !msg.media_reference.isNullOrEmpty()
+                                        val (success, error) = chatRepo.sendMessage(
+                                            sender = currentUsername,
+                                            receiver = partnerUsername,
+                                            content = retryContent,
+                                            mediaUri = null,
+                                            mediaType = if (isMedia) msg.message_type else "TEXT"
+                                        )
+                                        if (success) {
+                                            // Delete the failed message locally
+                                            triggerTypingIndicator()
+                                        } else {
+                                            Toast.makeText(context, error ?: "Retry failed", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+
+                // Typing indicator at the bottom
+                item {
+                    AnimatedVisibility(visible = showTypingIndicator) {
+                        TypingIndicator()
+                    }
                 }
             }
 
@@ -539,6 +605,8 @@ fun ChatScreen(
                                     isSending = false
                                     if (!success) {
                                         Toast.makeText(context, error ?: "Send failed", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        triggerTypingIndicator()
                                     }
                                 }
                             }
@@ -614,6 +682,34 @@ fun ChatScreen(
                     Icon(Icons.Default.Lock, contentDescription = null, tint = CleanShieldCyanBright, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Self-destruct in ${countdown}s", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+
+                // Semi-transparent overlay with countdown
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))
+                            )
+                        )
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.Visibility, contentDescription = null, tint = CleanShieldCyanBright, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "This media was viewed once  •  Self-destructing in ${countdown}s",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
         }
@@ -701,42 +797,88 @@ fun ChatScreen(
 fun ChatMessageBubble(
     message: SupabaseMessage,
     isMine: Boolean,
-    onOneShotClicked: () -> Unit
+    onOneShotClicked: () -> Unit,
+    onRetry: () -> Unit
 ) {
     val context = LocalContext.current
-    val timeFormatted = remember(message.timestamp) {
-        SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(message.timestamp))
+    val timeFormatted = remember(message.sentAtMillis) {
+        SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(message.sentAtMillis))
     }
 
     val isOneShot = message.message_type.startsWith("ONE_SHOT")
+    val isFailed = message.status == "FAILED"
+
+    // WhatsApp-style bubble shape: 12dp corners, with sharp corner on the tail side
+    val bubbleShape = RoundedCornerShape(
+        topStart = 12.dp,
+        topEnd = 12.dp,
+        bottomStart = if (isMine) 12.dp else 4.dp,
+        bottomEnd = if (isMine) 4.dp else 12.dp
+    )
+
+    // Gradient for sent messages, solid for received
+    val sentGradient = Brush.horizontalGradient(listOf(CleanShieldCyan, CleanShieldBlue))
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
         horizontalArrangement = if (isMine) Arrangement.End else Arrangement.Start
     ) {
         Column(
             modifier = Modifier
                 .widthIn(max = 280.dp)
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 16.dp,
-                        topEnd = 16.dp,
-                        bottomStart = if (isMine) 16.dp else 4.dp,
-                        bottomEnd = if (isMine) 4.dp else 16.dp
-                    )
+                .shadow(
+                    elevation = 2.dp,
+                    shape = bubbleShape,
+                    ambientColor = Color.Black.copy(alpha = 0.08f),
+                    spotColor = Color.Black.copy(alpha = 0.12f)
                 )
+                .clip(bubbleShape)
                 .background(
-                    if (isMine) CleanShieldBlue else Color.White
+                    if (isFailed) Color(0xFFFFEBEE) else if (isMine) sentGradient else Color.White
                 )
                 .border(
                     width = if (isMine) 0.dp else 1.dp,
-                    color = if (isMine) Color.Transparent else Color(0xFFE2E8F0),
-                    shape = RoundedCornerShape(16.dp)
+                    color = if (isFailed) CleanShieldError.copy(alpha = 0.3f) else if (isMine) Color.Transparent else CleanShieldSurfaceBorder,
+                    shape = bubbleShape
                 )
-                .padding(10.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
+            // ── One-Shot Badge ──
             if (isOneShot) {
-                // One-Shot Media bubble
+                // Gradient badge above the one-shot content
+                val badgeGradient = Brush.horizontalGradient(
+                    listOf(Color(0xFFD97706), Color(0xFFB45309))
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .background(badgeGradient, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(10.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "One Shot",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                // One-Shot Media bubble content
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -773,12 +915,39 @@ fun ChatMessageBubble(
                         )
                     }
                 }
+
+                // Semi-transparent overlay for already-opened one-shots
+                if (message.one_shot_opened) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.Black.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Visibility,
+                                contentDescription = null,
+                                tint = CleanShieldTextMuted,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "This media was viewed once",
+                                fontSize = 10.sp,
+                                color = CleanShieldTextMuted,
+                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                            )
+                        }
+                    }
+                }
             } else if (!message.media_reference.isNullOrEmpty()) {
-                // Regular Media Photo/Video
+                // ── Regular Media Photo/Video ──
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(1.3f)
+                        .heightIn(max = 240.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color.Black),
                     contentAlignment = Alignment.Center
@@ -790,25 +959,42 @@ fun ChatMessageBubble(
                             .build(),
                         contentDescription = "Media",
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp)
                     )
 
+                    // Video play button overlay
                     if (message.message_type == "VIDEO") {
-                        Icon(
-                            imageVector = Icons.Default.PlayCircle,
-                            contentDescription = "Video",
-                            tint = Color.White,
-                            modifier = Modifier.size(36.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(Color.Black.copy(alpha = 0.5f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = "Play Video",
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-            } else {
-                // Text Message
+                // "Sent as media" label
                 Text(
-                    text = message.content,
+                    text = if (message.message_type == "VIDEO") "Sent as video" else "Sent as media",
+                    fontSize = 10.sp,
+                    color = if (isMine) Color.White.copy(alpha = 0.7f) else CleanShieldTextMuted,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                )
+            } else {
+                // ── Text Message ──
+                Text(
+                    text = message.content ?: "",
                     fontSize = 14.sp,
-                    color = if (isMine) Color.White else CleanShieldDarkNavy
+                    color = if (isFailed) CleanShieldError else if (isMine) Color.White else CleanShieldTextPrimary
                 )
             }
 
@@ -822,7 +1008,7 @@ fun ChatMessageBubble(
                 Text(
                     text = timeFormatted,
                     fontSize = 10.sp,
-                    color = if (isMine) Color.White.copy(alpha = 0.75f) else Color.Gray
+                    color = if (isMine) Color.White.copy(alpha = 0.75f) else CleanShieldTextMuted
                 )
 
                 if (isMine) {
@@ -851,7 +1037,157 @@ fun ChatMessageBubble(
                                 modifier = Modifier.size(14.dp)
                             )
                         }
+                        "FAILED" -> {
+                            // Retry button for failed messages
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Retry",
+                                tint = CleanShieldError,
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clickable { onRetry() }
+                            )
+                        }
                     }
+                }
+            }
+        }
+    }
+}
+
+// ── Date Separator Composable ──
+@Composable
+private fun ChatDateSeparator(dateText: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .background(
+                    CleanShieldSurfaceBorder.copy(alpha = 0.5f),
+                    RoundedCornerShape(50.dp)
+                )
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = dateText,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = CleanShieldTextSecondary,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+// ── Typing Indicator Composable ──
+@Composable
+private fun TypingIndicator() {
+    val infiniteTransition = rememberInfiniteTransition(label = "typing")
+    val dot1 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 600
+                0f at 0
+                1f at 300
+                0f at 600
+            },
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "dot1"
+    )
+    val dot2 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 600
+                0f at 100
+                1f at 400
+                0f at 600
+            },
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "dot2"
+    )
+    val dot3 by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = keyframes {
+                durationMillis = 600
+                0f at 200
+                1f at 500
+                0f at 600
+            },
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "dot3"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, top = 8.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Box(
+            modifier = Modifier
+                .shadow(
+                    elevation = 1.dp,
+                    shape = RoundedCornerShape(12.dp),
+                    ambientColor = Color.Black.copy(alpha = 0.06f),
+                    spotColor = Color.Black.copy(alpha = 0.08f)
+                )
+                .background(Color.White, RoundedCornerShape(12.dp))
+                .border(1.dp, CleanShieldSurfaceBorder, RoundedCornerShape(12.dp))
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "typing",
+                    fontSize = 12.sp,
+                    color = CleanShieldTextMuted
+                )
+                // Animated dots
+                Box(
+                    modifier = Modifier.size(4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(4.dp * (0.5f + dot1 * 0.5f))
+                            .background(CleanShieldTextMuted, CircleShape)
+                    )
+                }
+                Box(
+                    modifier = Modifier.size(4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(4.dp * (0.5f + dot2 * 0.5f))
+                            .background(CleanShieldTextMuted, CircleShape)
+                    )
+                }
+                Box(
+                    modifier = Modifier.size(4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(4.dp * (0.5f + dot3 * 0.5f))
+                            .background(CleanShieldTextMuted, CircleShape)
+                    )
                 }
             }
         }

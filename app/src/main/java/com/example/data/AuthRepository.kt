@@ -2,6 +2,8 @@ package com.example.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
+import android.webkit.MimeTypeMap
 import com.example.data.supabase.SupabaseClient
 import io.github.jan-tennert.supabase.auth.auth
 import io.github.jan-tennert.supabase.auth.providers.builtin.Email
@@ -89,6 +91,7 @@ class AuthRepository private constructor(context: Context) {
 
     private val sb get() = SupabaseClient.client
     private val postgrest get() = SupabaseClient.postgrest
+    private val storage get() = SupabaseClient.storage
 
     private val ktorClient = HttpClient(OkHttp)
 
@@ -205,21 +208,53 @@ class AuthRepository private constructor(context: Context) {
         return@withContext UsernameValidationResult.Valid
     }
 
+    suspend fun uploadProfileImage(userId: String, imageUri: Uri): Pair<String?, String?> = withContext(Dispatchers.IO) {
+        try {
+            val bytes = appContext.contentResolver.openInputStream(imageUri)?.use { it.readBytes() }
+                ?: return@withContext Pair(null, "Could not read the selected image.")
+
+            // Determine file extension from content resolver
+            var ext = "jpg"
+            val mimeType: String? = appContext.contentResolver.getType(imageUri)
+            if (mimeType != null) {
+                val map = MimeTypeMap.getSingleton()
+                val mapped = map.getExtensionFromMimeType(mimeType)
+                if (!mapped.isNullOrEmpty()) ext = mapped
+            }
+
+            val storagePath = "$userId/profile.$ext"
+            storage.from("profile-images").upload(storagePath, bytes)
+            return@withContext Pair(storagePath, null)
+        } catch (e: Exception) {
+            return@withContext Pair(null, "Photo upload failed: ${e.localizedMessage}")
+        }
+    }
+
     suspend fun updateUserProfile(userId: String, username: String, name: String, bio: String, photoUri: String?): Pair<Boolean, String?> = withContext(Dispatchers.IO) {
         try {
             val uv = validateUsernameForProfile(username.trim().lowercase(), userId)
             if (uv is UsernameValidationResult.Invalid) return@withContext Pair(false, uv.reason)
             if (name.trim().isEmpty()) return@withContext Pair(false, "Name cannot be empty.")
+
+            // If photoUri is a local content:// URI, upload to Supabase Storage first
+            val resolvedPhotoUri: String? = if (photoUri != null && photoUri.startsWith("content://")) {
+                val (storagePath, uploadError) = uploadProfileImage(userId, Uri.parse(photoUri))
+                if (uploadError != null) return@withContext Pair(false, uploadError)
+                storagePath
+            } else {
+                photoUri
+            }
+
             postgrest.from("profiles").update({
                 set("username", username.trim().lowercase())
                 set("name", name.trim())
                 set("bio", bio.trim())
-                set("profile_image", photoUri)
+                set("profile_image", resolvedPhotoUri)
                 set("updated_at", java.time.Instant.now().toString())
             }) { filter { eq("id", userId) } }
             _currentSession.value?.let { cur ->
                 if (cur.id == userId) saveActiveSession(cur.copy(
-                    username = username.trim().lowercase(), name = name.trim(), bio = bio.trim(), profilePhotoUri = photoUri
+                    username = username.trim().lowercase(), name = name.trim(), bio = bio.trim(), profilePhotoUri = resolvedPhotoUri
                 ))
             }
             return@withContext Pair(true, null)

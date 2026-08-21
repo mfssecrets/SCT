@@ -5,6 +5,12 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,6 +21,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,6 +29,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
@@ -41,7 +49,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -65,6 +72,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -82,11 +90,18 @@ import com.example.ui.components.CleanShieldBottomNavBar
 import com.example.ui.components.CleanShieldTab
 import com.example.ui.components.CleanShieldTopHeader
 import com.example.ui.theme.CleanShieldBlue
+import com.example.ui.theme.CleanShieldCyan
 import com.example.ui.theme.CleanShieldCyanBright
 import com.example.ui.theme.CleanShieldDarkNavy
 import com.example.ui.theme.CleanShieldError
+import com.example.ui.theme.CleanShieldSurface
+import com.example.ui.theme.CleanShieldSurfaceBorder
+import com.example.ui.theme.CleanShieldTextPrimary
+import com.example.ui.theme.CleanShieldTextSecondary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.log10
+import kotlin.math.pow
 
 enum class VaultSetupStep {
     CHECKING,
@@ -133,6 +148,11 @@ fun PrivateVaultScreen(
     val cyanTealGradient = remember {
         Brush.horizontalGradient(listOf(CleanShieldCyanBright, CleanShieldBlue))
     }
+
+    // Determine grid columns: 3 on phones, 4 on tablets
+    val configuration = LocalConfiguration.current
+    val isTablet = remember(configuration) { configuration.screenWidthDp >= 600 }
+    val gridColumns = if (isTablet) GridCells.Fixed(4) else GridCells.Fixed(3)
 
     // Auto-lock vault on disposal/screen exit
     DisposableEffect(Unit) {
@@ -215,26 +235,13 @@ fun PrivateVaultScreen(
                 selectedTab = CleanShieldTab.PRIVATE_VAULT,
                 onTabSelected = onNavigateToTab
             )
-        },
-        floatingActionButton = {
-            if (setupStep == VaultSetupStep.UNLOCKED && !isUploading) {
-                FloatingActionButton(
-                    onClick = { mediaPickerLauncher.launch("*/*") },
-                    containerColor = CleanShieldBlue,
-                    contentColor = Color.White,
-                    shape = CircleShape,
-                    modifier = Modifier.testTag("vault_upload_fab")
-                ) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = "Upload Media")
-                }
-            }
         }
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color.White)
+                .background(CleanShieldSurface)
         ) {
             when (setupStep) {
                 VaultSetupStep.CHECKING -> {
@@ -352,13 +359,13 @@ fun PrivateVaultScreen(
                                     progress = { uploadProgress },
                                     modifier = Modifier.fillMaxWidth().height(4.dp),
                                     color = CleanShieldBlue,
-                                    trackColor = Color(0xFFE2E8F0)
+                                    trackColor = CleanShieldSurfaceBorder
                                 )
                             }
                         }
 
                         if (vaultMediaList.isEmpty()) {
-                            // Empty Vault State
+                            // Empty Vault State with improved upload drop target
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -370,7 +377,7 @@ fun PrivateVaultScreen(
                                         modifier = Modifier
                                             .size(80.dp)
                                             .clip(CircleShape)
-                                            .background(Color(0xFFF0F7FA))
+                                            .background(CleanShieldCyan.copy(alpha = 0.12f))
                                             .border(2.dp, cyanTealGradient, CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -386,35 +393,48 @@ fun PrivateVaultScreen(
                                         text = "Private Vault is Empty",
                                         fontSize = 18.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = CleanShieldDarkNavy
+                                        color = CleanShieldTextPrimary
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = "Store confidential photos and videos securely. Files are encrypted with your 4-digit PIN and hidden from the device gallery.",
                                         fontSize = 13.sp,
-                                        color = Color.Gray,
+                                        color = CleanShieldTextSecondary,
                                         textAlign = TextAlign.Center
                                     )
                                     Spacer(modifier = Modifier.height(24.dp))
-                                    Button(
-                                        onClick = { mediaPickerLauncher.launch("*/*") },
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = ButtonDefaults.buttonColors(containerColor = CleanShieldBlue),
-                                        modifier = Modifier.testTag("empty_vault_upload_button")
-                                    ) {
-                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Upload Photo or Video")
-                                    }
+                                    // Gradient dashed border drop target button
+                                    VaultDropTargetButton(onClick = { mediaPickerLauncher.launch("*/*") })
                                 }
                             }
                         } else {
-                            // Grid of Encrypted Media
+                            // Media count badge
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${vaultMediaList.size} item${if (vaultMediaList.size != 1) "s" else ""}",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = CleanShieldTextPrimary
+                                )
+                                Text(
+                                    text = "Encrypted & Secure",
+                                    fontSize = 12.sp,
+                                    color = CleanShieldTextSecondary
+                                )
+                            }
+
+                            // Grid of Encrypted Media with responsive columns
                             LazyVerticalGrid(
-                                columns = GridCells.Fixed(3),
+                                columns = gridColumns,
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(8.dp)
+                                    .padding(horizontal = 8.dp)
                                     .testTag("vault_media_grid"),
                                 contentPadding = PaddingValues(bottom = 80.dp),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -424,6 +444,14 @@ fun PrivateVaultScreen(
                                     VaultMediaGridItem(
                                         media = item,
                                         onClick = { viewingMedia = item }
+                                    )
+                                }
+
+                                // Add Media drop target as the last grid item
+                                item(span = { GridItemSpan(if (isTablet) 4 else 3) }) {
+                                    VaultDropTargetButton(
+                                        onClick = { mediaPickerLauncher.launch("*/*") },
+                                        modifier = Modifier.padding(vertical = 8.dp)
                                     )
                                 }
                             }
@@ -449,7 +477,7 @@ fun PrivateVaultScreen(
                 // Media preview
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data(media.media_reference)
+                        .data(media.secure_storage_reference)
                         .crossfade(true)
                         .build(),
                     contentDescription = "Private Media",
@@ -457,7 +485,7 @@ fun PrivateVaultScreen(
                     modifier = Modifier.fillMaxSize()
                 )
 
-                if (media.message_type == "VIDEO") {
+                if (media.media_type == "VIDEO") {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -504,12 +532,12 @@ fun PrivateVaultScreen(
         AlertDialog(
             onDismissRequest = { mediaToDelete = null },
             title = { Text("Delete Vault Media?", fontWeight = FontWeight.Bold) },
-            text = { Text("Are you sure you want to permanently delete this ${if (target.message_type == "VIDEO") "video" else "photo"} from your encrypted vault? This action cannot be undone.") },
+            text = { Text("Are you sure you want to permanently delete this ${if (target.media_type == "VIDEO") "video" else "photo"} from your encrypted vault? This action cannot be undone.") },
             confirmButton = {
                 Button(
                     onClick = {
                         scope.launch {
-                            vaultRepo.deleteVaultMedia(target.id, target.media_reference)
+                            vaultRepo.deleteVaultMedia(target.id, currentUsername, target.secure_storage_reference ?: "")
                             if (viewingMedia?.id == target.id) viewingMedia = null
                             mediaToDelete = null
                             Toast.makeText(context, "Media deleted from vault.", Toast.LENGTH_SHORT).show()
@@ -529,24 +557,94 @@ fun PrivateVaultScreen(
     }
 }
 
+/**
+ * Gradient dashed-border drop target button for adding media to the vault.
+ */
+@Composable
+private fun VaultDropTargetButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val cyanTealGradient = remember {
+        Brush.horizontalGradient(listOf(CleanShieldCyan, CleanShieldBlue))
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(CleanShieldCyan.copy(alpha = 0.06f))
+            .border(
+                width = 2.dp,
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        CleanShieldCyan.copy(alpha = 0.6f),
+                        CleanShieldBlue.copy(alpha = 0.6f),
+                        CleanShieldCyan.copy(alpha = 0.6f),
+                        CleanShieldBlue.copy(alpha = 0.6f)
+                    )
+                ),
+                shape = RoundedCornerShape(16.dp),
+                dashArray = floatArrayOf(12f, 8f)
+            )
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(cyanTealGradient),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add Media",
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+            Text(
+                text = "Add Media",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = CleanShieldBlue
+            )
+        }
+    }
+}
+
+/**
+ * A single media thumbnail in the vault grid, with gradient overlay and file size label.
+ */
 @Composable
 fun VaultMediaGridItem(
     media: SupabaseVaultMedia,
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
+    val fileSizeLabel = remember(media.file_size_bytes) {
+        formatFileSize(media.file_size_bytes)
+    }
+
     Box(
         modifier = Modifier
             .aspectRatio(1f)
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF1E293B))
+            .background(CleanShieldDarkNavy)
             .clickable { onClick() }
             .testTag("vault_item_${media.id}"),
         contentAlignment = Alignment.Center
     ) {
+        // Thumbnail image
         AsyncImage(
             model = ImageRequest.Builder(context)
-                .data(media.media_reference)
+                .data(media.secure_storage_reference)
                 .crossfade(true)
                 .build(),
             contentDescription = "Encrypted Media",
@@ -554,7 +652,8 @@ fun VaultMediaGridItem(
             modifier = Modifier.fillMaxSize()
         )
 
-        if (media.message_type == "VIDEO") {
+        // Video play icon overlay
+        if (media.media_type == "VIDEO") {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -569,9 +668,39 @@ fun VaultMediaGridItem(
                 )
             }
         }
+
+        // Dark gradient overlay from bottom + file size label
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.4f)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.7f)
+                        )
+                    )
+                ),
+            contentAlignment = Alignment.BottomStart
+        ) {
+            if (fileSizeLabel != null) {
+                Text(
+                    text = fileSizeLabel,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White.copy(alpha = 0.92f),
+                    modifier = Modifier.padding(6.dp)
+                )
+            }
+        }
     }
 }
 
+/**
+ * PIN keypad view with pulsing glow shield icon.
+ */
 @Composable
 fun VaultPinKeypadView(
     title: String,
@@ -581,6 +710,27 @@ fun VaultPinKeypadView(
     onDigitClick: (String) -> Unit,
     onBackspace: () -> Unit
 ) {
+    // Pulsing glow animation for shield icon
+    val infiniteTransition = rememberInfiniteTransition(label = "shield_glow")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shield_glow_alpha"
+    )
+    val glowScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shield_glow_scale"
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -594,28 +744,61 @@ fun VaultPinKeypadView(
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Shield icon with pulsing glow
             Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFE0F2FE)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Security,
-                    contentDescription = null,
-                    tint = CleanShieldBlue,
-                    modifier = Modifier.size(32.dp)
+                // Outer glow circle
+                Box(
+                    modifier = Modifier
+                        .size((84 * glowScale).dp)
+                        .clip(CircleShape)
+                        .background(
+                            CleanShieldCyan.copy(alpha = glowAlpha * 0.18f)
+                        )
                 )
+                // Inner glow circle
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(
+                            CleanShieldCyan.copy(alpha = glowAlpha * 0.12f)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Solid icon background
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                    CleanShieldCyanBright.copy(alpha = 0.3f),
+                                    CleanShieldBlue.copy(alpha = 0.15f)
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Security,
+                            contentDescription = null,
+                            tint = CleanShieldBlue,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             Text(
                 text = title,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = CleanShieldDarkNavy
+                color = CleanShieldTextPrimary
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -623,7 +806,7 @@ fun VaultPinKeypadView(
             Text(
                 text = subtitle,
                 fontSize = 13.sp,
-                color = Color.Gray,
+                color = CleanShieldTextSecondary,
                 textAlign = TextAlign.Center
             )
 
@@ -641,11 +824,11 @@ fun VaultPinKeypadView(
                             .size(18.dp)
                             .clip(CircleShape)
                             .background(
-                                if (isFilled) CleanShieldBlue else Color(0xFFE2E8F0)
+                                if (isFilled) CleanShieldBlue else CleanShieldSurfaceBorder
                             )
                             .border(
                                 width = 1.5.dp,
-                                color = if (isFilled) CleanShieldBlue else Color(0xFF94A3B8),
+                                color = if (isFilled) CleanShieldBlue else CleanShieldTextSecondary.copy(alpha = 0.4f),
                                 shape = CircleShape
                             )
                     )
@@ -659,7 +842,7 @@ fun VaultPinKeypadView(
                     fontSize = 13.sp,
                     color = CleanShieldError,
                     fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center
+                    textAlign = Alignment.Center
                 )
             }
         }
@@ -699,7 +882,7 @@ fun VaultPinKeypadView(
                                     text = "⌫",
                                     fontSize = 24.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = CleanShieldDarkNavy
+                                    color = CleanShieldTextPrimary
                                 )
                             }
                         } else {
@@ -707,8 +890,8 @@ fun VaultPinKeypadView(
                                 modifier = Modifier
                                     .size(68.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFFF8FAFC))
-                                    .border(1.dp, Color(0xFFE2E8F0), CircleShape)
+                                    .background(CleanShieldSurface)
+                                    .border(1.dp, CleanShieldSurfaceBorder, CircleShape)
                                     .clickable { onDigitClick(key) }
                                     .testTag("pin_digit_$key"),
                                 contentAlignment = Alignment.Center
@@ -717,13 +900,35 @@ fun VaultPinKeypadView(
                                     text = key,
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = CleanShieldDarkNavy
+                                    color = CleanShieldTextPrimary
                                 )
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Formats a byte count into a human-readable string (e.g. "2.4 MB", "156 KB").
+ */
+private fun formatFileSize(bytes: Long?): String? {
+    if (bytes == null || bytes <= 0) return null
+    return when {
+        bytes < 1024 -> "$bytes B"
+        bytes < 1024 * 1024 -> {
+            val kb = bytes / 1024.0
+            if (kb < 100) "%.1f KB".format(kb) else "${kb.toInt()} KB"
+        }
+        bytes < 1024 * 1024 * 1024 -> {
+            val mb = bytes / (1024.0 * 1024.0)
+            "%.1f MB".format(mb)
+        }
+        else -> {
+            val gb = bytes / (1024.0 * 1024.0 * 1024.0)
+            "%.1f GB".format(gb)
         }
     }
 }

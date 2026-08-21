@@ -1,7 +1,12 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -75,16 +80,17 @@ fun OptimiseScanningScreen(
     var rawProgress by remember { mutableFloatStateOf(0f) }
     var currentPathIndex by remember { mutableStateOf(0) }
 
-    val scanPaths = remember {
+    // Generic scan location labels – no real filesystem paths (spec §6)
+    val scanLocations = remember {
         listOf(
-            "/storage/emulated/0/Download",
-            "/storage/emulated/0/Android/data/cache",
-            "/system/app/telemetry/temp",
-            "/data/user/0/com.clean.shield/cache",
-            "/storage/emulated/0/DCIM/.thumbnails",
-            "/data/system/usagestats/clean",
-            "/storage/emulated/0/Documents/temp_logs",
-            "/system/priv-app/integrity_check"
+            "Download cache files",
+            "App cache data",
+            "System telemetry data",
+            "Temporary files",
+            "Thumbnail cache",
+            "Usage statistics cache",
+            "Log files",
+            "System integrity data"
         )
     }
 
@@ -94,7 +100,7 @@ fun OptimiseScanningScreen(
             val elapsed = System.currentTimeMillis() - startTime
             val fraction = (elapsed.toFloat() / scanDurationMillis).coerceIn(0f, 1f)
             rawProgress = fraction * 100f
-            currentPathIndex = ((elapsed / 380L) % scanPaths.size).toInt()
+            currentPathIndex = ((elapsed / 380L) % scanLocations.size).toInt()
             if (fraction >= 1f) {
                 delay(300)
                 onScanComplete()
@@ -260,7 +266,7 @@ fun OptimiseScanningScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // Sub-status & Dynamic Path Readout
+            // Sub-status & Dynamic Location Readout (generic labels only)
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -273,7 +279,7 @@ fun OptimiseScanningScreen(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = scanPaths.getOrElse(currentPathIndex) { "/storage/emulated/0/Download" },
+                    text = scanLocations.getOrElse(currentPathIndex) { "Temporary files" },
                     color = CleanShieldTextDim,
                     fontSize = 13.sp,
                     maxLines = 1
@@ -364,8 +370,44 @@ private fun ScanRecordRow(
     isScanning: Boolean,
     modifier: Modifier = Modifier
 ) {
+    // Shimmer effect for currently scanning categories
+    val infiniteTransition = rememberInfiniteTransition(label = "scan_shimmer")
+    val shimmerAlpha by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "scan_shimmer_alpha"
+    )
+
+    val shimmerModifier = if (isScanning) {
+        modifier.drawBehind {
+            // Subtle left-to-right shimmer highlight
+            val shimmerWidth = size.width * 0.4f
+            val xOffset = shimmerAlpha * (size.width + shimmerWidth) - shimmerWidth
+            drawRect(
+                brush = Brush.horizontalGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        CleanShieldCyan.copy(alpha = 0.06f),
+                        CleanShieldCyan.copy(alpha = 0.12f),
+                        CleanShieldCyan.copy(alpha = 0.06f),
+                        Color.Transparent
+                    ),
+                    startX = xOffset,
+                    endX = xOffset + shimmerWidth
+                ),
+                size = size
+            )
+        }
+    } else {
+        modifier
+    }
+
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = shimmerModifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         CategoryIconBox(

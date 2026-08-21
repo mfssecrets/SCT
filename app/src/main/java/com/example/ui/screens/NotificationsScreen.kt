@@ -94,6 +94,7 @@ import com.example.data.SocialRepository
 import com.example.data.SupabaseNotification
 import com.example.data.SupabaseProfile
 import com.example.ui.components.CleanShieldErrorView
+import com.example.ui.components.CleanShieldTopHeader
 import com.example.ui.theme.CleanShieldBlue
 import com.example.ui.theme.CleanShieldCardBorder
 import com.example.ui.theme.CleanShieldCyan
@@ -116,6 +117,7 @@ import java.util.Locale
 fun NotificationsScreen(
     onNavigateBack: () -> Unit,
     onNavigateToChat: (String) -> Unit,
+    onNavigateToInbox: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -146,12 +148,6 @@ fun NotificationsScreen(
     var pendingAcceptTarget by remember { mutableStateOf<NotificationItemWithUser?>(null) }
     var pendingRejectTarget by remember { mutableStateOf<NotificationItemWithUser?>(null) }
     var showClearAllConfirm by remember { mutableStateOf(false) }
-
-    val cyanTealGradient = remember {
-        Brush.horizontalGradient(
-            colors = listOf(CleanShieldCyanBright, CleanShieldBlue)
-        )
-    }
 
     // Confirmation Dialog for Accept
     if (pendingAcceptTarget != null) {
@@ -357,63 +353,14 @@ fun NotificationsScreen(
             .fillMaxSize()
             .testTag("notifications_screen"),
         topBar = {
-            // Fixed gradient header (#5DE0E6 -> #0078A6)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(cyanTealGradient)
-                    .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Back icon
-                    IconButton(
-                        onClick = onNavigateBack,
-                        modifier = Modifier.testTag("notifications_back_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-
-                    // Title with unread badge count
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = "Notifications",
-                            color = Color.White,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (unreadCount > 0) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                                    .padding(horizontal = 7.dp, vertical = 2.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "$unreadCount",
-                                    color = CleanShieldBlue,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-
-                    // Header Right Actions (Mark all read & Clear all)
+            CleanShieldTopHeader(
+                title = "Notifications",
+                showBackButton = true,
+                onBackClicked = onNavigateBack,
+                onMessengerClicked = onNavigateToInbox,
+                onNotificationClicked = {},
+                unreadNotificationsCount = unreadCount,
+                extraActionContent = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (unreadCount > 0) {
                             IconButton(
@@ -451,7 +398,7 @@ fun NotificationsScreen(
                         }
                     }
                 }
-            }
+            )
         }
     ) { paddingValues ->
         Box(

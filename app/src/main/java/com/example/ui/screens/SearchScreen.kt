@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -60,11 +61,16 @@ import com.example.data.SocialRepository
 import com.example.data.UserRelationshipStatus
 import com.example.data.UserSearchResult
 import com.example.ui.components.CleanShieldBottomNavBar
+import com.example.ui.components.CleanShieldEmptyState
+import com.example.ui.components.CleanShieldErrorView
 import com.example.ui.components.CleanShieldTab
 import com.example.ui.components.CleanShieldTopHeader
 import com.example.ui.theme.CleanShieldBlue
+import com.example.ui.theme.CleanShieldCyan
 import com.example.ui.theme.CleanShieldDarkNavy
 import com.example.ui.theme.CleanShieldError
+import com.example.ui.theme.CleanShieldTextHint
+import com.example.ui.theme.CleanShieldTextPrimary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -90,25 +96,36 @@ fun SearchScreen(
     var searchResult by remember { mutableStateOf<UserSearchResult?>(null) }
     var hasSearched by remember { mutableStateOf(false) }
     var isSendingRequest by remember { mutableStateOf(false) }
+    var searchError by remember { mutableStateOf(false) }
+    var searchTrigger by remember { mutableStateOf(0) }
 
     var userToBlock by remember { mutableStateOf<UserSearchResult?>(null) }
 
     // Search by username ONLY with debounce
-    LaunchedEffect(searchQuery) {
+    LaunchedEffect(searchQuery, searchTrigger) {
         val q = searchQuery.trim().lowercase().removePrefix("@")
         if (q.isBlank()) {
             searchResult = null
             hasSearched = false
             isSearching = false
+            searchError = false
             return@LaunchedEffect
         }
 
+        searchError = false
         isSearching = true
         delay(350)
-        val result = socialRepo.searchByExactUsername(currentUsername, q)
-        searchResult = result
-        hasSearched = true
-        isSearching = false
+        try {
+            val result = socialRepo.searchByExactUsername(currentUsername, q)
+            searchResult = result
+            hasSearched = true
+            searchError = false
+        } catch (_: Exception) {
+            searchError = true
+            hasSearched = false
+        } finally {
+            isSearching = false
+        }
     }
 
     Scaffold(
@@ -151,7 +168,7 @@ fun SearchScreen(
                         .fillMaxWidth()
                         .height(52.dp)
                         .testTag("username_search_input"),
-                    placeholder = { Text("Search by username only...", fontSize = 13.sp, color = Color.Gray) },
+                    placeholder = { Text("Search by username only...", fontSize = 13.sp, color = CleanShieldTextHint) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Search,
@@ -166,7 +183,7 @@ fun SearchScreen(
                                 Icon(
                                     imageVector = Icons.Default.Clear,
                                     contentDescription = "Clear",
-                                    tint = Color.Gray,
+                                    tint = CleanShieldTextHint,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -184,9 +201,9 @@ fun SearchScreen(
 
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Clean Shield allows user lookup by exact username only.",
+                    text = "Search by exact username to find users and send friend requests.",
                     fontSize = 11.sp,
-                    color = Color.Gray
+                    color = CleanShieldTextHint
                 )
             }
 
@@ -208,48 +225,22 @@ fun SearchScreen(
                                 modifier = Modifier.size(36.dp)
                             )
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text("Searching username...", color = Color.Gray, fontSize = 13.sp)
+                            Text("Searching username...", color = CleanShieldTextHint, fontSize = 13.sp)
                         }
                     }
+                } else if (searchError) {
+                    // Error / retry state
+                    CleanShieldErrorView(
+                        message = "Search failed. Please check your connection and try again.",
+                        onRetry = { searchTrigger++ }
+                    )
                 } else if (hasSearched && searchResult == null) {
-                    // Empty result
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFF1F5F9)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = null,
-                                    tint = Color.Gray,
-                                    modifier = Modifier.size(32.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "No user found",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = CleanShieldDarkNavy
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "No account found matching \"$searchQuery\". Check username spelling.",
-                                fontSize = 13.sp,
-                                color = Color.Gray,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
-                    }
+                    // Empty result – shared component
+                    CleanShieldEmptyState(
+                        icon = Icons.Default.Search,
+                        title = "No user found",
+                        subtitle = "No account found matching \"$searchQuery\". Check username spelling."
+                    )
                 } else if (searchResult != null) {
                     val result = searchResult!!
                     val targetUser = result.user
@@ -257,74 +248,90 @@ fun SearchScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp)
+                            .padding(top = 12.dp)
                     ) {
-                        Row(
+                        // Gradient border wrapper
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xFFF8FAFC))
-                                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(16.dp))
-                                .padding(16.dp)
-                                .testTag("search_result_card"),
-                            verticalAlignment = Alignment.CenterVertically
+                                .testTag("search_result_card")
                         ) {
-                            // Profile Image
+                            // Gradient border background
                             Box(
                                 modifier = Modifier
-                                    .size(54.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xFFE0F2FE)),
-                                contentAlignment = Alignment.Center
+                                    .matchParentSize()
+                                    .background(
+                                        Brush.linearGradient(colors = listOf(CleanShieldCyan, CleanShieldBlue)),
+                                        RoundedCornerShape(16.dp)
+                                    )
+                            )
+                            // Inner card content
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(2.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(Color(0xFFF8FAFC))
+                                    .padding(18.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                if (!targetUser.profilePhotoUri.isNullOrEmpty()) {
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(context)
-                                            .data(targetUser.profilePhotoUri)
-                                            .crossfade(true)
-                                            .build(),
-                                        contentDescription = "User Photo",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                } else {
-                                    Text(
-                                        text = targetUser.name.take(1).ifBlank { targetUser.username.take(1) }.uppercase(),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 20.sp,
-                                        color = CleanShieldBlue
-                                    )
+                                // Profile Image
+                                Box(
+                                    modifier = Modifier
+                                        .size(54.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFE0F2FE)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (!targetUser.profilePhotoUri.isNullOrEmpty()) {
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(context)
+                                                .data(targetUser.profilePhotoUri)
+                                                .crossfade(true)
+                                                .build(),
+                                            contentDescription = "User Photo",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    } else {
+                                        Text(
+                                            text = targetUser.name.take(1).ifBlank { targetUser.username.take(1) }.uppercase(),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 20.sp,
+                                            color = CleanShieldBlue
+                                        )
+                                    }
                                 }
-                            }
 
-                            Spacer(modifier = Modifier.width(14.dp))
+                                Spacer(modifier = Modifier.width(14.dp))
 
-                            // Name & Username
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = targetUser.name.ifBlank { targetUser.username },
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = CleanShieldDarkNavy
-                                )
-                                Text(
-                                    text = "@${targetUser.username}",
-                                    fontSize = 13.sp,
-                                    color = Color.Gray
-                                )
-                                if (targetUser.bio.isNotBlank()) {
-                                    Spacer(modifier = Modifier.height(2.dp))
+                                // Name & Username
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = targetUser.bio,
-                                        fontSize = 11.sp,
-                                        color = Color(0xFF64748B),
-                                        maxLines = 1
+                                        text = targetUser.name.ifBlank { targetUser.username },
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CleanShieldTextPrimary
                                     )
+                                    Text(
+                                        text = "@${targetUser.username}",
+                                        fontSize = 13.sp,
+                                        color = CleanShieldTextHint
+                                    )
+                                    if (targetUser.bio.isNotBlank()) {
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = targetUser.bio,
+                                            fontSize = 11.sp,
+                                            color = Color(0xFF64748B),
+                                            maxLines = 1
+                                        )
+                                    }
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
                         // Action Buttons: Request & Block
                         Row(
@@ -478,29 +485,12 @@ fun SearchScreen(
                         }
                     }
                 } else {
-                    // Initial prompt state
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = null,
-                                tint = Color(0xFFCBD5E1),
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = "Enter an exact username to find users and send friend requests.",
-                                fontSize = 13.sp,
-                                color = Color.Gray,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                            )
-                        }
-                    }
+                    // Initial prompt state – shared component
+                    CleanShieldEmptyState(
+                        icon = Icons.Default.Search,
+                        title = "Search for Users",
+                        subtitle = "Enter an exact username to find users and send friend requests."
+                    )
                 }
             }
         }
